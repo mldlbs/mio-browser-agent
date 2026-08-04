@@ -92,9 +92,9 @@ node tests/cdp/run-all.js
 说明：
 - 浏览器测试需本机安装 Chrome（或设置 `CHROME_PATH` 环境变量指向 chrome.exe）
 - 扩展的 content script 注入在 CDP 自动化 + 临时 profile 下暂不受支持（Chrome 已知限制），该 suite 会打印原因并优雅跳过（退出码 0）
-- CI（GitHub Actions）会自动跑这两条路径，见 `.github/workflows/test.yml`
+- CI（GitHub Actions）会自动跑这两条路径，见 `.github/workflows/test.yml`（已实测通过：unit + browser 双 job 全绿）
 
-浏览器内人工验证（可选）：打开 `tests/test-page.html`，在侧边面板执行测试页上的目标任务。
+浏览器内人工回归（真机端到端）：打开 `tests/test-page.html`，在侧边面板执行目标任务「在搜索框输入 hello 并点击登录按钮，最后提取页面文字」。已实测通过：规划出 3 步 → 输入 hello → 点击登录（计数 +1）→ extract_text 返回页面文字（含 `=== ALL PASS ===`），recoveries 0 / replans 0。
 
 ## 📄 License
 
