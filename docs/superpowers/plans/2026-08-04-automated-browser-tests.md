@@ -446,28 +446,31 @@ git commit -m "test: unified browser test runner + CI workflow"
 - Test: `tests/test-page.html` 扩展的任务目标提示词（人工在侧边栏跑一次）
 - 记录：本次回归的结论写入 README「已知验证」或本计划附录
 
-- [ ] **Step 1: 在真机扩展跑一个端到端任务**
+- [x] **Step 1: 在真机扩展跑一个端到端任务**
 
 手动操作：`chrome://extensions` 重新加载扩展 → 打开侧边栏 → 目标输入「在搜索框输入 hello 并点击提交按钮」（沿用 README 示例）→ 观察 mio 规划、点击、输入、完成。
 期望：规划器产出步骤、executor 依次执行、日志流着色正常、状态 pill 转 done。
+**结果（2026-08-04）：通过**。任务目标「在搜索框输入 hello 并点击登录按钮，最后提取页面文字」完整跑通：规划出 3 步 → 输入 hello → 点击登录（计数 +1）→ extract_text 返回页面文字（含 `=== ALL PASS ===`），recoveries 0 / replans 0。
 
-- [ ] **Step 2: 记录回归结论**
+- [x] **Step 2: 记录回归结论**
 
 若通过：README 增补一行「已用真实浏览器验证 test-page.html 任务（2026-08-04）」。
 若发现 bug：按 systematic-debugging 处理，修完补测试再回到本步骤。
+**结果：通过**，README 已记录真机回归结论。
 
-- [ ] **Step 3: 提交**
+- [x] **Step 3: 提交**
 
 ```bash
 git add README.md
 git commit -m "docs: note real-browser regression on test page"
 ```
+**结果：已提交** `a92ee54`（docs: record Task 5 manual regression pass result）并推送。
 
 ---
 
 ## Self-Review
 
-**Spec coverage:** 目标=自动化真实浏览器测试。Task1 建 CDP 基础（√）、Task2 真实 DOM content 逻辑（√，替代人工 browser-test.js）、Task3 扩展注入（√）、Task4 runner+CI（√）、Task5 真机回归（√）。缺项：无测试覆盖率统计——不引入依赖的前提下可用 `--coverage` 的 Node 内置单测替代，属后续 backlog，非本计划范围。
+**Spec coverage:** 目标=自动化真实浏览器测试。Task1 建 CDP 基础（√）、Task2 真实 DOM content 逻辑（√，替代人工 browser-test.js）、Task3 扩展注入（√）、Task4 runner+CI（√）、Task5 真机回归（√，2026-08-04 手动通过）。缺项：无测试覆盖率统计——不引入依赖的前提下可用 `--coverage` 的 Node 内置单测替代，属后续 backlog，非本计划范围。
 
 **Placeholder scan:** 无 TBD/TODO 占位；所有代码块完整。Task3 的注入标记依赖 content/main.js 现状，用"检测既有副作用或加一行标记"明确兜底，非占位。
 
