@@ -10,6 +10,7 @@ function connect(wsUrl, options = {}) {
     const timeoutMs = options.timeoutMs || REQUEST_TIMEOUT_MS;
     let nextId = 0;
     const pending = new Map();
+    const eventHandlers = new Map();
 
     function failAllPending(err) {
       for (const { rej, timer } of pending.values()) {
@@ -34,6 +35,12 @@ function connect(wsUrl, options = {}) {
             ws.send(JSON.stringify(msg));
           });
         },
+        on(method, cb) {
+          let list = eventHandlers.get(method);
+          if (!list) { list = new Set(); eventHandlers.set(method, list); }
+          list.add(cb);
+          return () => list.delete(cb);
+        },
         close() { ws.close(); },
       });
     });
@@ -50,6 +57,12 @@ function connect(wsUrl, options = {}) {
         clearTimeout(timer);
         if (msg.error) rej(new Error(msg.error.message));
         else res(msg.result);
+        return;
+      }
+      if (msg.method && eventHandlers.has(msg.method)) {
+        eventHandlers.get(msg.method).forEach((cb) => {
+          try { cb(msg.params, msg.sessionId); } catch (_) {}
+        });
       }
     });
     ws.addEventListener("error", (e) => reject(new Error("CDP socket error: " + e.message)));

@@ -1,3 +1,5 @@
+window.__mioContentLoaded = (window.__mioContentLoaded || 0) + 1;
+try { if (document.documentElement) document.documentElement.setAttribute("data-mio-content", "1"); } catch (e) {}
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || !request.type) return;
   const payload = request.payload || {};

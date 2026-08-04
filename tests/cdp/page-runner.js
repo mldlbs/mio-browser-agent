@@ -1,14 +1,15 @@
 "use strict";
 // Drives a Chrome tab to a URL, injects an assertion script, collects results.
 
-async function openTab(browser, url) {
+async function openTab(browser, url, readyExpr) {
+  const expr = readyExpr || "document.readyState === 'complete' && typeof captureSnapshot === 'function'";
   const { targetId } = await browser.send("Target.createTarget", { url });
   const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
   await browser.send("Page.enable", {}, sessionId);
   await browser.send("Runtime.enable", {}, sessionId);
   for (let i = 0; i < 100; i++) {
     const { result } = await browser.send("Runtime.evaluate", {
-      expression: "document.readyState === 'complete' && typeof captureSnapshot === 'function'",
+      expression: expr,
       returnByValue: true,
     }, sessionId);
     if (result && result.value) return { targetId, sessionId };

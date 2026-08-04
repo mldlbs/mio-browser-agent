@@ -31,11 +31,13 @@ async function launchChrome(options = {}) {
   const port = options.port || 9300 + Math.floor(Math.random() * 1000);
   const userDataDir = options.userDataDir || fs.mkdtempSync(path.join(os.tmpdir(), "mio-cdp-"));
   const args = [
-    "--headless=new", "--disable-gpu", "--no-first-run",
+    options.headful ? "--no-first-run" : "--headless=new",
+    options.headful ? undefined : "--disable-gpu",
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${userDataDir}`,
-  ];
+  ].filter(Boolean);
   if (options.loadExtension) {
+    args.push(`--disable-extensions-except=${path.resolve(options.loadExtension)}`);
     args.push(`--load-extension=${path.resolve(options.loadExtension)}`);
   }
   if (options.browserArgs) args.push(...options.browserArgs);
