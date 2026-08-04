@@ -30,6 +30,20 @@ global.getToolsSchema = registryMod.getToolsSchema;
 global.createAdapter = (s) => adapterMod.createAdapter(s);
 const runtimeMod = require("../sidepanel/agent-runtime.js");
 
+// Stub DOM element constructors so setNativeValue can run in Node.
+// executor.js reads HTML*Element.prototype's "value" descriptor and calls its
+// setter with the mock element as `this`; the setter writes a real own property.
+function stubValueSetter(name) {
+  global[name] = function () {};
+  Object.defineProperty(global[name].prototype, "value", {
+    configurable: true,
+    set(v) { Object.defineProperty(this, "value", { value: v, configurable: true, writable: true }); },
+    get() { return this._v; },
+  });
+}
+["HTMLTextAreaElement", "HTMLInputElement", "HTMLSelectElement"].forEach(stubValueSetter);
+
+
 function mockLlm(script) {
   let i = 0;
   return { generate: async () => (script[i] ? script[i++]() : { content: "", toolCalls: [] }) };
@@ -133,28 +147,23 @@ function assertEq(got, want, name) {
   const savedG = global.document;
   global.document = rootDoc;
   const frameResolved = locatorMod.resolveFrameDoc([0]);
-  global.document = savedG;
   assert(frameResolved === iframeDoc, "resolveFrameDoc descends into same-origin iframe by index");
   assert(locatorMod.resolveFrameDoc([]) === rootDoc, "resolveFrameDoc empty path stays on root");
+  global.document = savedG;
 
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
-  let bodyText = "";
-  const wfSavedDoc = global.document;
-  global.document = {
-    body: { innerText: "" },
-    querySelector: () => null,
-    querySelectorAll: () => [],
-  };
+  const wfSaved = global.document;
+  const wfMockDoc = { body: { innerText: "" }, querySelector: () => null, querySelectorAll: () => [] };
+  global.document = wfMockDoc;
   global.location = { href: "https://x.example/page" };
   const wfTimeout = await contentExecMod.waitForCondition({ text: "加载完成", timeout: 100 });
   assert(!wfTimeout.ok && wfTimeout.errorCode === "WAIT_TIMEOUT", "waitForCondition times out with WAIT_TIMEOUT");
-  bodyText = "加载完成";
-  global.document.body.innerText = bodyText;
-  const wfOk = await contentExecMod.waitForCondition({ text: "加载完成", timeout: 500 });
-  global.document = wfSavedDoc;
-  assert(wfOk.ok, "waitForCondition succeeds when text present");
   const wfSel = await contentExecMod.waitForCondition({ selector: ".x", timeout: 100 });
   assert(!wfSel.ok && wfSel.errorCode === "WAIT_TIMEOUT", "waitForCondition selector absent times out");
+  wfMockDoc.body.innerText = "加载完成";
+  const wfOk = await contentExecMod.waitForCondition({ text: "加载完成", timeout: 500 });
+  global.document = wfSaved;
+  assert(wfOk.ok, "waitForCondition succeeds when text present");
 
   // ── snapshotStats summary ──
   const stats = protocol.snapshotStats(snap);
