@@ -19,7 +19,7 @@ function findChrome() {
 function killProc(proc) {
   if (process.platform === "win32") {
     try {
-      execSync("taskkill /pid " + proc.pid + " /t /f");
+      execSync("taskkill /pid " + proc.pid + " /t /f", { stdio: "ignore" });
       return;
     } catch (_) { /* fall through to proc.kill() */ }
   }

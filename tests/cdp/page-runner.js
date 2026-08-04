@@ -6,8 +6,15 @@ async function openTab(browser, url) {
   const { sessionId } = await browser.send("Target.attachToTarget", { targetId, flatten: true });
   await browser.send("Page.enable", {}, sessionId);
   await browser.send("Runtime.enable", {}, sessionId);
-  await new Promise((r) => setTimeout(r, 800));
-  return { targetId, sessionId };
+  for (let i = 0; i < 100; i++) {
+    const { result } = await browser.send("Runtime.evaluate", {
+      expression: "document.readyState === 'complete' && typeof captureSnapshot === 'function'",
+      returnByValue: true,
+    }, sessionId);
+    if (result && result.value) return { targetId, sessionId };
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  throw new Error("page did not become ready: " + url);
 }
 
 async function runInPage(browser, sessionId, script) {
@@ -16,8 +23,12 @@ async function runInPage(browser, sessionId, script) {
     awaitPromise: true,
     returnByValue: true,
   }, sessionId);
-  if (exceptionDetails) throw new Error("page script threw: " + JSON.stringify(exceptionDetails).slice(0, 300));
-  return result && result.value ? result.value : [];
+  if (exceptionDetails) {
+    const detail = (exceptionDetails.exception && exceptionDetails.exception.description)
+      || exceptionDetails.text || JSON.stringify(exceptionDetails);
+    throw new Error("page script threw: " + String(detail).slice(0, 500));
+  }
+  return result.value !== undefined ? result.value : [];
 }
 
 function report(results) {

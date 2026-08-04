@@ -1,11 +1,12 @@
 "use strict";
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { launchChrome } = require("./launch");
 const { openTab, runInPage, report } = require("./page-runner");
 
 (async () => {
-  const testPageUrl = "file:///" + path.resolve(__dirname, "../test-page.html").replace(/\\/g, "/");
-  const launched = await launchChrome({ url: testPageUrl });
+  const testPageUrl = pathToFileURL(path.resolve(__dirname, "../test-page.html")).href;
+  const launched = await launchChrome();
   try {
     const { sessionId } = await openTab(launched.browser, testPageUrl);
     const results = await runInPage(launched.browser, sessionId, `
