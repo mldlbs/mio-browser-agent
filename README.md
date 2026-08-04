@@ -71,7 +71,9 @@ tests/                        单元测试（Node 直接运行）
 
 ## 🧪 测试
 
-零依赖，直接用 Node 跑：
+零依赖，有两条自动路径：
+
+**单测**（快，覆盖核心逻辑）：
 
 ```bash
 node tests/test_agent.js
@@ -79,11 +81,20 @@ node tests/test_agent.js
 
 用例覆盖：快照构建、元素定位回退、工具注册、规划器、恢复引擎（重试/替代元素/重新规划）、运行时协议与 LLM 动作解码。
 
-浏览器内验证（需已加载扩展）：
+**浏览器集成测试**（自动拉起 headless Chrome，在真实 DOM 上验证 content 逻辑）：
 
 ```bash
-# 打开 tests/test-page.html，在侧边面板执行测试页上的目标任务
+node tests/cdp/run-all.js
 ```
+
+依次运行：CDP 冒烟探针 → 真实 DOM 断言（snapshot/locator/executor 在 test-page.html 上执行）→ 扩展注入探测。
+
+说明：
+- 浏览器测试需本机安装 Chrome（或设置 `CHROME_PATH` 环境变量指向 chrome.exe）
+- 扩展的 content script 注入在 CDP 自动化 + 临时 profile 下暂不受支持（Chrome 已知限制），该 suite 会打印原因并优雅跳过（退出码 0）
+- CI（GitHub Actions）会自动跑这两条路径，见 `.github/workflows/test.yml`
+
+浏览器内人工验证（可选）：打开 `tests/test-page.html`，在侧边面板执行测试页上的目标任务。
 
 ## 📄 License
 
