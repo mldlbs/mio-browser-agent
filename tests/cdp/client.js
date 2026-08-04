@@ -2,17 +2,33 @@
 // Zero-dependency CDP client using Node 22 native WebSocket.
 // Wraps a browser-level (or target-level) WebSocket with a promise-based send().
 
-function connect(wsUrl) {
+const REQUEST_TIMEOUT_MS = 15000;
+
+function connect(wsUrl, options = {}) {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(wsUrl);
+    const timeoutMs = options.timeoutMs || REQUEST_TIMEOUT_MS;
     let nextId = 0;
     const pending = new Map();
+
+    function failAllPending(err) {
+      for (const { rej, timer } of pending.values()) {
+        clearTimeout(timer);
+        rej(err);
+      }
+      pending.clear();
+    }
+
     ws.addEventListener("open", () => {
       resolve({
         send(method, params = {}, sessionId = null) {
           return new Promise((res, rej) => {
             const id = ++nextId;
-            pending.set(id, { res, rej });
+            const timer = setTimeout(() => {
+              pending.delete(id);
+              rej(new Error("CDP timeout: " + method));
+            }, timeoutMs);
+            pending.set(id, { res, rej, timer });
             const msg = { id, method, params };
             if (sessionId) msg.sessionId = sessionId;
             ws.send(JSON.stringify(msg));
@@ -22,15 +38,22 @@ function connect(wsUrl) {
       });
     });
     ws.addEventListener("message", (ev) => {
-      const msg = JSON.parse(ev.data);
+      let msg;
+      try {
+        msg = JSON.parse(ev.data);
+      } catch (_) {
+        return;
+      }
       if (msg.id && pending.has(msg.id)) {
-        const { res, rej } = pending.get(msg.id);
+        const { res, rej, timer } = pending.get(msg.id);
         pending.delete(msg.id);
+        clearTimeout(timer);
         if (msg.error) rej(new Error(msg.error.message));
         else res(msg.result);
       }
     });
     ws.addEventListener("error", (e) => reject(new Error("CDP socket error: " + e.message)));
+    ws.addEventListener("close", () => failAllPending(new Error("CDP socket closed")));
   });
 }
 
