@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "mio",
+  "version": "0.1.0",
+  "description": "自然语言驱动的浏览器 Agent：让幽灵般的助手替你在网页上点击、输入、提取内容。",
+  "permissions": ["activeTab", "scripting", "tabs", "sidePanel", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background/service-worker.js" },
+  "action": { "default_title": "mio" },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": [
+        "common/protocol.js",
+        "content/snapshot.js",
+        "content/locator.js",
+        "content/executor.js",
+        "content/main.js"
+      ]
+    }
+  ]
+}

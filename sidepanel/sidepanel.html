@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>mio</title>
+  <style>
+    :root {
+      --base: #181825;
+      --mantle: #1e1e2e;
+      --crust: #11111b;
+      --text: #cdd6f4;
+      --subtext: #a6adc8;
+      --overlay: #6c7086;
+      --surface: #313244;
+      --mauve: #cba6f7;
+      --lavender: #b4befe;
+      --teal: #94e2d5;
+      --pink: #f5c2e7;
+      --red: #f38ba8;
+      --green: #a6e3a1;
+      --radius: 14px;
+      --ghost-grad: radial-gradient(120% 140% at 30% 10%, rgba(203,166,247,.35) 0%, rgba(203,166,247,.06) 55%, transparent 100%);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--base);
+      color: var(--text);
+      font-family: "Unbounded", "Sora", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    /* ambient ghost glow */
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background: var(--ghost-grad);
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* drifting ghost mascot */
+    .ghost {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      width: 44px;
+      height: 44px;
+      opacity: .5;
+      z-index: 0;
+      animation: drift 6s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes drift {
+      0%,100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-6px) scale(1.03); }
+    }
+
+    header {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px 8px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .brand img {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      filter: drop-shadow(0 0 6px rgba(203,166,247,.5));
+    }
+    .brand .name {
+      font-weight: 700;
+      letter-spacing: .06em;
+      font-size: 15px;
+      background: linear-gradient(120deg, var(--mauve), var(--lavender));
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .brand .tagline {
+      font-size: 10px;
+      color: var(--overlay);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      color: var(--subtext);
+    }
+    .status-pill .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--overlay);
+      transition: background .3s;
+    }
+    .status-pill.running .dot { background: var(--teal); animation: pulse 1.4s infinite; }
+    .status-pill.done .dot { background: var(--green); }
+    .status-pill.error .dot { background: var(--red); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+    main {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 8px 14px 12px;
+      min-height: 0;
+    }
+
+    /* input card */
+    .compose {
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: var(--radius);
+      padding: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.3);
+    }
+    #goal {
+      width: 100%;
+      resize: none;
+      min-height: 48px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    #goal::placeholder { color: var(--overlay); }
+    .compose-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    button {
+      font-family: inherit;
+      font-size: 12px;
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 1px solid var(--surface);
+      background: var(--surface);
+      color: var(--text);
+      transition: transform .15s ease, filter .15s ease, background .2s;
+    }
+    button:hover { transform: translateY(-1px); filter: brightness(1.15); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    #start {
+      flex: 1;
+      border: none;
+      background: linear-gradient(120deg, var(--mauve), var(--lavender));
+      color: #1e1e2e;
+      font-weight: 700;
+      box-shadow: 0 4px 16px rgba(203,166,247,.25);
+    }
+    #start:disabled { background: var(--surface); color: var(--overlay); box-shadow: none; }
+    #stop { background: transparent; color: var(--red); border-color: rgba(243,139,168,.35); }
+
+    /* settings */
+    details.settings {
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: var(--radius);
+    }
+    summary {
+      cursor: pointer;
+      padding: 9px 12px;
+      font-size: 12px;
+      color: var(--subtext);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: "⚙"; font-size: 12px; }
+    details[open] summary { border-bottom: 1px solid var(--surface); }
+    .settings-body { padding: 10px 12px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+    label { font-size: 11px; color: var(--subtext); display: block; margin-bottom: 3px; }
+    input {
+      width: 100%;
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+    }
+    input:focus { border-color: var(--mauve); box-shadow: 0 0 0 2px rgba(203,166,247,.15); }
+    .settings-body .full { grid-column: 1 / -1; }
+    #saveSettings {
+      grid-column: 1 / -1;
+      background: var(--mauve);
+      color: #1e1e2e;
+      border: none;
+      font-weight: 600;
+    }
+
+    /* log */
+    .log-wrap {
+      flex: 1;
+      min-height: 0;
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: var(--radius);
+      padding: 8px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--surface) transparent;
+    }
+    .log-line {
+      margin: 3px 6px;
+      font-size: 11.5px;
+      line-height: 1.45;
+      color: var(--subtext);
+      white-space: pre-wrap;
+      word-break: break-all;
+      animation: rise .3s ease;
+    }
+    @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .log-line .tag { font-weight: 700; margin-right: 4px; }
+    .log-line.t-user .tag { color: var(--lavender); }
+    .log-line.t-step .tag { color: var(--teal); }
+    .log-line.t-tool .tag { color: var(--mauve); }
+    .log-line.t-finish .tag { color: var(--green); }
+    .log-line.t-warn .tag, .log-line.t-error .tag { color: var(--red); }
+    .log-line.t-plan .tag { color: var(--pink); }
+    .log-line.t-llm .tag { color: var(--overlay); }
+    .log-line.t-debug .tag { color: var(--overlay); opacity: .7; }
+    .log-line.t-trace .tag { color: var(--teal); }
+
+    footer {
+      position: relative;
+      z-index: 1;
+      padding: 6px 14px 10px;
+      font-size: 10px;
+      color: var(--overlay);
+      text-align: center;
+      letter-spacing: .1em;
+    }
+  </style>
+</head>
+<body>
+  <svg class="ghost" viewBox="0 0 40 40" fill="none">
+    <path d="M20 4C12 4 6 10 6 18v14c0 1.5 1.8 2.2 2.8 1L12 29l3 4 3-4 3 4 3-4 3 4 3-4 2.2 4c1 .2 2.8-.5 2.8-2V18C34 10 28 4 20 4Z" fill="rgba(203,166,247,.85)"/>
+    <ellipse cx="16.4" cy="16.5" rx="1.8" ry="2.2" fill="#181825"/>
+    <ellipse cx="23.6" cy="16.5" rx="1.8" ry="2.2" fill="#181825"/>
+    <circle cx="16.4" cy="16.5" r="4.5" fill="rgba(24,24,37,.12)"/>
+    <circle cx="23.6" cy="16.5" r="4.5" fill="rgba(24,24,37,.12)"/>
+  </svg>
+
+  <header>
+    <div class="brand">
+      <img src="../icon48.png" alt="mio">
+      <div>
+        <div class="name">mio</div>
+        <div class="tagline">browser agent</div>
+      </div>
+    </div>
+    <div class="status-pill" id="statusBox">
+      <span class="dot"></span>
+      <span id="status">idle</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="compose">
+      <textarea id="goal" placeholder="告诉 mio 你想做什么…&#10;例如：在搜索框输入 hello 并点击提交"></textarea>
+      <div class="compose-actions">
+        <button id="start">开始任务</button>
+        <button id="stop">停止</button>
+      </div>
+    </section>
+
+    <details class="settings">
+      <summary>设置</summary>
+      <div class="settings-body">
+        <div><label>Provider</label><input id="provider" placeholder="openai"></div>
+        <div><label>Model</label><input id="model" placeholder="gpt-4o-mini"></div>
+        <div class="full"><label>Base URL</label><input id="baseUrl" placeholder="https://api.openai.com/v1"></div>
+        <div class="full"><label>API Key</label><input id="apiKey" type="password"></div>
+        <div><label>Max Steps</label><input id="maxSteps" type="number" value="30"></div>
+        <button id="saveSettings">保存设置</button>
+      </div>
+    </details>
+
+    <div class="log-wrap" id="log"></div>
+  </main>
+
+  <footer>mio · 幽灵一般的浏览器助手</footer>
+
+  <script src="../common/logger.js"></script>
+  <script src="../common/protocol.js"></script>
+  <script src="../common/storage.js"></script>
+  <script src="../llm/adapter.js"></script>
+  <script src="../llm/openai.js"></script>
+  <script src="../tools/registry.js"></script>
+  <script src="../tools/click.js"></script>
+  <script src="../tools/type.js"></script>
+  <script src="../tools/scroll.js"></script>
+  <script src="../tools/wait.js"></script>
+  <script src="../tools/navigate.js"></script>
+  <script src="../tools/extract_text.js"></script>
+  <script src="../tools/paste.js"></script>
+  <script src="../tools/tab.js"></script>
+  <script src="bridge.js"></script>
+  <script src="planner.js"></script>
+  <script src="memory.js"></script>
+  <script src="recovery-context.js"></script>
+  <script src="recovery-result.js"></script>
+  <script src="recovery-policy.js"></script>
+  <script src="recovery-engine.js"></script>
+  <script src="runtime-protocol.js"></script>
+  <script src="turn-handler.js"></script>
+  <script src="metrics.js"></script>
+  <script src="executor.js"></script>
+  <script src="agent-runtime.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>

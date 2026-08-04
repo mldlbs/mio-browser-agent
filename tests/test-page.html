@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <title>Browser Agent Content Test</title>
+  <style>body { font-family: monospace; background: #111; color: #cdd6f4; padding: 16px; }</style>
+</head>
+<body>
+  <h1>content 逻辑浏览器测试</h1>
+  <button id="btn-login" onclick="window.__clicked=(window.__clicked||0)+1">登录</button>
+  <label for="input-search">搜索</label>
+  <input id="input-search" type="text" placeholder="输入关键词">
+  <a id="link-home" href="#home">首页</a>
+  <div id="box-editor" contenteditable="true">hello</div>
+  <label><input id="chk-remember" type="checkbox">记住我</label>
+  <hr>
+  <div id="results"></div>
+
+  <script src="../common/protocol.js"></script>
+  <script src="../content/snapshot.js"></script>
+  <script src="../content/locator.js"></script>
+  <script src="../content/executor.js"></script>
+  <script src="browser-test.js"></script>
+</body>
+</html>
