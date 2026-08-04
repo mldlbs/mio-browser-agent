@@ -96,6 +96,10 @@ node tests/cdp/run-all.js
 
 浏览器内人工回归（真机端到端）：打开 `tests/test-page.html`，在侧边面板执行目标任务「在搜索框输入 hello 并点击登录按钮，最后提取页面文字」。已实测通过：规划出 3 步 → 输入 hello → 点击登录（计数 +1）→ extract_text 返回页面文字（含 `=== ALL PASS ===`），recoveries 0 / replans 0。
 
+## 🗺️ Roadmap
+
+后续功能规划见 [`docs/roadmap.md`](docs/roadmap.md)（按优先级 P0-P4 + 信号驱动）。
+
 ## 📄 License
 
 [MIT](LICENSE)
