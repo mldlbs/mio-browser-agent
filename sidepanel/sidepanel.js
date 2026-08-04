@@ -1,6 +1,7 @@
 const $ = (id) => document.getElementById(id);
 
 let runtime = null;
+let currentTask = null;
 
 function appendLog(tag, text) {
   const log = $("log");
@@ -13,6 +14,24 @@ function appendLog(tag, text) {
   div.appendChild(document.createTextNode(text));
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+}
+
+function renderLogLine(container, tag, text) {
+  const div = document.createElement("div");
+  div.className = "log-line t-" + (tag || "ui");
+  const tagEl = document.createElement("span");
+  tagEl.className = "tag";
+  tagEl.textContent = tag ? tag + ":" : "";
+  div.appendChild(tagEl);
+  div.appendChild(document.createTextNode(text));
+  container.appendChild(div);
+}
+
+function formatTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.getMonth() + 1 + "-" + d.getDate() + " " +
+    String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 
 function setStatus(state, cls) {
@@ -49,6 +68,87 @@ async function init() {
 
   $("start").addEventListener("click", startTask);
   $("stop").addEventListener("click", () => { if (runtime) runtime.stop(); });
+  $("historyToggle").addEventListener("click", toggleHistory);
+  $("historyClose").addEventListener("click", toggleHistory);
+  $("historyClear").addEventListener("click", clearHistory);
+}
+
+function toggleHistory() {
+  const view = $("historyView");
+  const showing = view.classList.toggle("open");
+  if (showing) renderHistory();
+}
+
+async function clearHistory() {
+  await HistoryModule.clearHistory();
+  renderHistory();
+  appendLog("ui", "历史记录已清空");
+}
+
+async function historyLog(goal) {
+  if (!currentTask) return;
+  currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
+  await HistoryModule.addHistoryRecord(currentTask);
+  currentTask = null;
+}
+
+function renderHistory() {
+  const list = $("historyList");
+  list.innerHTML = "";
+  HistoryModule.getHistory().then((records) => {
+    if (!records.length) {
+      const empty = document.createElement("div");
+      empty.className = "history-empty";
+      empty.textContent = "暂无历史记录";
+      list.appendChild(empty);
+      return;
+    }
+    for (const r of records) {
+      const item = document.createElement("div");
+      item.className = "history-item s-" + r.status;
+      const head = document.createElement("div");
+      head.className = "history-item-head";
+      const info = document.createElement("div");
+      info.className = "history-item-info";
+      const goalEl = document.createElement("div");
+      goalEl.className = "history-goal";
+      goalEl.textContent = r.goal;
+      const meta = document.createElement("div");
+      meta.className = "history-meta";
+      meta.textContent = formatTime(r.startedAt) + " · " +
+        (r.status === "done" ? "完成" : r.status === "error" ? "出错" : r.status) +
+        (r.recoveries || r.replans ? " · 恢复 " + r.recoveries + "/重规划 " + r.replans : "");
+      info.appendChild(goalEl);
+      info.appendChild(meta);
+      const badge = document.createElement("span");
+      badge.className = "history-status";
+      badge.textContent = r.status;
+      head.appendChild(info);
+      head.appendChild(badge);
+      const body = document.createElement("div");
+      body.className = "history-item-body";
+      if (r.summary) {
+        const sum = document.createElement("div");
+        sum.className = "history-summary";
+        sum.textContent = r.summary;
+        body.appendChild(sum);
+      }
+      const logsWrap = document.createElement("div");
+      logsWrap.className = "history-logs";
+      body.appendChild(logsWrap);
+      item.appendChild(head);
+      item.appendChild(body);
+      head.addEventListener("click", () => {
+        const open = item.classList.toggle("open");
+        if (open) {
+          logsWrap.innerHTML = "";
+          for (const l of r.logs) renderLogLine(logsWrap, l.tag, l.text);
+          logsWrap.scrollTop = logsWrap.scrollHeight;
+        }
+      });
+      list.appendChild(item);
+    }
+  });
 }
 
 async function startTask() {
@@ -70,18 +170,46 @@ async function startTask() {
   setStatus("planning", "running");
   $("start").disabled = true;
 
+  currentTask = {
+    id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+    goal,
+    status: "running",
+    summary: "",
+    startedAt: Date.now(),
+    finishedAt: 0,
+    recoveries: 0,
+    replans: 0,
+    logs: [],
+  };
+
   runtime = createAgentRuntime({
     settings,
     bridge: createPageBridge(),
-    onLog: (tag, text) => appendLog(tag, text),
+    onLog: (tag, text) => {
+      appendLog(tag, text);
+      if (currentTask) {
+        currentTask.logs.push({ tag, text, ts: Date.now() });
+        if (tag === "result") currentTask.summary = text;
+      }
+    },
     onState: (state) => setStatus(state),
     deps: { maxSteps: settings.maxSteps || 30 },
   });
 
   try {
     await runtime.run(goal);
+    const m = (globalThis.MetricsModule && globalThis.MetricsModule.getMetrics) ? globalThis.MetricsModule.getMetrics() : {};
+    currentTask.status = "done";
+    currentTask.recoveries = m.recoveryCount || 0;
+    currentTask.replans = m.replanCount || 0;
+    currentTask.finishedAt = Date.now();
+    await historyLog(goal);
     setStatus("done", "done");
   } catch (e) {
+    currentTask.status = "error";
+    currentTask.summary = e.message || String(e);
+    currentTask.finishedAt = Date.now();
+    await historyLog(goal);
     appendLog("error", e.message || String(e));
     setStatus("error", "error");
   } finally {

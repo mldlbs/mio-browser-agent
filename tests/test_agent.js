@@ -3,6 +3,7 @@ const snapshotMod = require("../content/snapshot.js");
 const contentExecMod = require("../content/executor.js");
 const locatorMod = require("../content/locator.js");
 const storage = require("../common/storage.js");
+const historyMod = require("../common/history.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -175,6 +176,32 @@ function assertEq(got, want, name) {
   const s = storage.normalizeSettings({ apiKey: "k" });
   assertEq(s.provider, "openai", "normalizeSettings provider default");
   assertEq(s.apiKey, "k", "normalizeSettings keeps apiKey");
+
+  // ── history ──
+  const histStore = {};
+  global.chrome = { storage: { local: {
+    get: async (key) => ({ [key]: histStore[key] }),
+    set: async (obj) => { Object.assign(histStore, obj); },
+    remove: async (key) => { delete histStore[key]; },
+  } } };
+  await historyMod.clearHistory();
+  const hist1 = historyMod.normalizeRecord({ id: "a", goal: "点登录", status: "done", logs: [{ tag: "step", text: "x" }] });
+  assertEq(hist1.goal, "点登录", "normalizeRecord keeps goal");
+  assertEq(hist1.recoveries, 0, "normalizeRecord defaults recoveries");
+  await historyMod.addHistoryRecord({ id: "a", goal: "任务A", status: "done", startedAt: 1, logs: [{ tag: "step", text: "s1" }] });
+  await historyMod.addHistoryRecord({ id: "b", goal: "任务B", status: "error", startedAt: 2, logs: [{ tag: "tool", text: "t1" }] });
+  const histAll = await historyMod.getHistory();
+  assertEq(histAll.length, 2, "history stores both records");
+  assertEq(histAll[0].goal, "任务B", "history newest first");
+  assertEq(histAll[1].logs.length, 1, "history keeps logs");
+  const many = [];
+  for (let i = 0; i < historyMod.MAX_RECORDS + 5; i++) many.push({ id: "r" + i, goal: "g" + i, status: "done" });
+  for (const r of many) await historyMod.addHistoryRecord(r);
+  const capped = await historyMod.getHistory();
+  assertEq(capped.length, historyMod.MAX_RECORDS, "history capped at MAX_RECORDS");
+  await historyMod.clearHistory();
+  assertEq((await historyMod.getHistory()).length, 0, "clearHistory empties storage");
+  delete global.chrome;
 
   // ── adapter normalize ──
   const comp = adapterMod.normalizeCompletion({
