@@ -132,6 +132,18 @@ function assertEq(got, want, name) {
   };
   assertEq(snapshotMod.computeAccessibleName(svgIconBtn), "发送", "icon button named from svg title");
 
+  // ── annotatePositions: icon buttons near a textbox get a position hint ──
+  const posElems = [
+    { index: 0, role: "textbox", name: "输入框(占位: 给 DeepSeek 发送消息 )", boundingBox: { x: 0, y: 100, w: 300, h: 40 } },
+    { index: 1, role: "button", name: "图标按钮", boundingBox: { x: 320, y: 108, w: 24, h: 24 } },
+    { index: 2, role: "button", name: "发送", boundingBox: { x: 400, y: 0, w: 10, h: 10 } },
+    { index: 3, role: "button", name: "div", boundingBox: { x: 330, y: 108, w: 24, h: 24 } },
+  ];
+  snapshotMod.annotatePositions(posElems);
+  assert(posElems[1].name.includes("输入框右"), "icon button near textbox gets right hint");
+  assert(posElems[2].name === "发送", "named button keeps its own name");
+  assert(posElems[3].name.includes("输入框右"), "bare-div button also gets position hint");
+
   // ── extractPageText: pulls readable text, strips noise, caps length ──
   const savedDoc = global.document;
   const savedLoc = global.location;

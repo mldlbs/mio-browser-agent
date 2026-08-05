@@ -230,6 +230,7 @@ function captureSnapshot() {
   const visited = new Set();
   visited.add(document);
   scanRoot(document, [], [], elements, visited);
+  annotatePositions(elements);
   return { url: location.href, title: document.title, timestamp: Date.now(), elements };
 }
 
@@ -240,9 +241,49 @@ function captureFrameSnapshot() {
   const visited = new Set();
   visited.add(document);
   scanRoot(document, [], [], elements, visited, { frames: false });
+  annotatePositions(elements);
   return { url: location.href, title: document.title, timestamp: Date.now(), elements };
 }
 
+// Annotate elements with their spatial relation to the nearest textbox. Icon-only
+// buttons (send/submit) share one generic name; position disambiguates them, e.g.
+// "图标按钮" becomes "图标按钮(输入框右下)" so the agent picks the right control.
+function annotatePositions(elements) {
+  const inputs = elements.filter((e) => (e.role === "textbox" || e.role === "combobox") && e.boundingBox);
+  if (!inputs.length) return;
+  elements.forEach((e) => {
+    if (!e.boundingBox) return;
+    if (e.role !== "button") return;
+    // Only enrich icon-ish/unnamed buttons; named buttons already self-describe.
+    if (/图标/.test(e.name) || e.name === "div" || /^图标/.test(e.name)) {
+      const rel = positionRelativeTo(e.boundingBox, inputs);
+      if (rel) e.name = e.name + "(" + rel + ")";
+    }
+  });
+}
+
+function positionRelativeTo(box, inputs) {
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  let best = null;
+  let bestD = Infinity;
+  for (const inp of inputs) {
+    const b = inp.boundingBox;
+    const d = Math.hypot(cx - (b.x + b.w / 2), cy - (b.y + b.h / 2));
+    if (d < bestD) { bestD = d; best = inp; }
+  }
+  if (!best) return "";
+  const b = best.boundingBox;
+  const dx = cx - (b.x + b.w / 2);
+  const dy = cy - (b.y + b.h / 2);
+  const horiz = dx > 12 ? "右" : dx < -12 ? "左" : "";
+  const vert = dy > 12 ? "下" : dy < -12 ? "上" : "";
+  const parts = [];
+  if (vert) parts.push(vert);
+  if (horiz) parts.push(horiz);
+  return parts.length ? "输入框" + parts.join("") : "输入框旁";
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { captureSnapshot, captureFrameSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath };
+  module.exports = { captureSnapshot, captureFrameSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath, annotatePositions };
 }
