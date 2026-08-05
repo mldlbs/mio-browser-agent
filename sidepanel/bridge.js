@@ -93,6 +93,16 @@ function createPageBridge() {
       if (!res || res.type !== MSG.ACTION_RESULT) throw new Error("bad action response");
       return res.payload.result;
     },
+    // Screenshot the active tab as a base64 data URL (for vision-based recovery).
+    async capture() {
+      const tab = await getActiveTab();
+      try {
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
+        return dataUrl || null;
+      } catch (_) {
+        return null; // requires "activeTab" or host permission; caller degrades gracefully
+      }
+    },
     // ── tab management (browser-level, no content script needed) ──
     async tabList() {
       const tabs = await chrome.tabs.query({});

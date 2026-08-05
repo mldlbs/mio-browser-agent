@@ -24,6 +24,7 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
         maxStepRetries: deps.maxStepRetries || 3,
         maxSteps: deps.maxSteps || 30,
         maxRecoveryAttempts: deps.maxRecoveryAttempts || 2,
+        enableVision: !!settings.enableVision,
         isStopped: () => stopRequested,
       });
       onState(result.ok ? "done" : "error");

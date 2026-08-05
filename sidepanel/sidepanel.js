@@ -93,6 +93,7 @@ async function init() {
   $("baseUrl").value = s.baseURL;
   $("apiKey").value = s.apiKey;
   $("maxSteps").value = s.maxSteps;
+  $("enableVision").checked = !!s.enableVision;
 
   $("saveSettings").addEventListener("click", async () => {
     await setSettings({
@@ -101,6 +102,7 @@ async function init() {
       baseURL: $("baseUrl").value.trim() || "https://api.openai.com/v1",
       apiKey: $("apiKey").value.trim(),
       maxSteps: parseInt($("maxSteps").value, 10) || 30,
+      enableVision: !!$("enableVision").checked,
     });
     toast("设置已保存");
   });
@@ -281,6 +283,7 @@ async function startTask(resume) {
     baseURL: $("baseUrl").value.trim() || "https://api.openai.com/v1",
     apiKey: $("apiKey").value.trim(),
     maxSteps: parseInt($("maxSteps").value, 10) || 30,
+    enableVision: !!$("enableVision").checked,
   };
   await setSettings(settings);
   if (!settings.apiKey) { toast("请先保存 API Key"); $("apiKey").focus(); return; }

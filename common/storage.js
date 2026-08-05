@@ -4,6 +4,7 @@ const DEFAULT_SETTINGS = {
   baseURL: "https://api.openai.com/v1",
   apiKey: "",
   maxSteps: 30,
+  enableVision: false,
 };
 
 function normalizeSettings(s) {

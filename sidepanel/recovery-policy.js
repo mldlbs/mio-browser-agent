@@ -36,8 +36,23 @@ function getMaxAttemptsForAction(errorCode, action, policy = DEFAULT_RECOVERY_PO
   return found ? found.maxAttempts : 0;
 }
 
+// Return a policy that injects vision_locate as a last resort: after DOM-retry
+// actions are exhausted but before giving up entirely (priority between DOM
+// actions and finish). Only used when the vision fallback is enabled.
+function withVisionFallback(policy = DEFAULT_RECOVERY_POLICY) {
+  const out = {};
+  for (const [code, actions] of Object.entries(policy)) {
+    if (!actions.some((a) => a.action === "vision_locate")) {
+      out[code] = [...actions, { action: "vision_locate", priority: 15, maxAttempts: 1 }];
+    } else {
+      out[code] = actions;
+    }
+  }
+  return out;
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { DEFAULT_RECOVERY_POLICY, getAllowedActions, getMaxAttemptsForAction };
+  module.exports = { DEFAULT_RECOVERY_POLICY, getAllowedActions, getMaxAttemptsForAction, withVisionFallback };
 } else {
-  globalThis.RecoveryPolicyModule = { DEFAULT_RECOVERY_POLICY, getAllowedActions, getMaxAttemptsForAction };
+  globalThis.RecoveryPolicyModule = { DEFAULT_RECOVERY_POLICY, getAllowedActions, getMaxAttemptsForAction, withVisionFallback };
 }

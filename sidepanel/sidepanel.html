@@ -519,6 +519,7 @@
         <div class="full"><label>Base URL</label><input id="baseUrl" placeholder="https://api.openai.com/v1"></div>
         <div class="full"><label>API Key</label><input id="apiKey" type="password"></div>
         <div><label>Max Steps</label><input id="maxSteps" type="number" value="30"></div>
+        <div><label><input id="enableVision" type="checkbox" style="width:auto; vertical-align:middle"> Vision 兜底</label></div>
         <button id="saveSettings">保存设置</button>
       </div>
     </details>
@@ -548,6 +549,7 @@
   <script src="../common/storage.js"></script>
   <script src="../common/history.js"></script>
   <script src="recovery-events.js"></script>
+  <script src="vision.js"></script>
   <script src="../llm/adapter.js"></script>
   <script src="../llm/openai.js"></script>
   <script src="../tools/registry.js"></script>

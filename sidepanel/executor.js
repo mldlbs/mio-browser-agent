@@ -15,6 +15,10 @@ const _recordReplan = metricsMod.recordReplan;
 const _ActTurnHandler = turnHandlerMod.ActTurnHandler;
 const _RecoveryTurnHandler = turnHandlerMod.RecoveryTurnHandler;
 const _snapshotStats = typeof module !== "undefined" ? require("../common/protocol.js").snapshotStats : globalThis.snapshotStats;
+const visionMod = typeof module !== "undefined"
+  ? require("./vision.js")
+  : globalThis.VisionModule;
+const _runVisionFallback = visionMod ? visionMod.runVisionFallback : null;
 
 // AGENT_PROMPT and buildSystemPrompt
 const AGENT_PROMPT = `You are a web automation agent operating in the user's Chrome browser.
@@ -193,7 +197,7 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
     task: ctx.goal,
     stepId: ctx.currentStepId,
     recoveryAttempt: (ctx.recoveryAttempts || 0) + 1,
-    maxRecoveryAttempts: ctx.maxRecoveryAttempts || 2,
+    maxRecoveryAttempts: (ctx.maxRecoveryAttempts || 2) + (ctx.enableVision ? 3 : 0),
     lastAction: ctx.lastAction,
     lastError: { code: errorCode, message: errorDetails?.message || errorCode },
     recoveryHistory: ctx.recoveryHistory || [],
@@ -202,8 +206,12 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
       url: ctx.lastSnapshot.url,
       title: ctx.lastSnapshot.title
     } : { elementCount: 0, url: "", title: "" },
-    capabilities: { vision: false, planner: false, ocr: false }
+    capabilities: { vision: !!ctx.enableVision, planner: false, ocr: false }
   };
+  if (ctx.enableVision) {
+    const policyMod = typeof module !== "undefined" ? require("./recovery-policy.js") : globalThis.RecoveryPolicyModule;
+    if (policyMod && policyMod.withVisionFallback) recoveryContext.policy = policyMod.withVisionFallback();
+  }
 
   const emit = (ev) => ctx.onRecovery && ctx.onRecovery(ev);
   emit({ kind: "error", stepId: ctx.currentStepId, code: errorCode, message: errorDetails?.message || errorCode });
@@ -254,6 +262,39 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
       ctx.recoveryHistory.push("wait_and_retry");
       emit({ kind: "attempt", action, reason: recoveryResult.detail?.reason || "等待后重试", ok: true, attempt });
       return okFor;
+
+    case "vision_locate":
+      // Last-resort fallback: ask a vision model what it sees when DOM retries keep failing.
+      if (!ctx.enableVision || !_runVisionFallback) {
+        emit({ kind: "outcome", outcome: "exhausted" });
+        return notOk("Vision fallback disabled");
+      }
+      {
+        const targetDesc = errorDetails?.message || `目标元素 ${ctx.lastSnapshot ? `(页面: ${ctx.lastSnapshot.url})` : ""}`;
+        emit({ kind: "attempt", action, reason: "DOM 重试均失败，尝试视觉识别", ok: true, attempt });
+        const v = await _runVisionFallback({
+          bridge: ctx.bridge,
+          llm: ctx.visionLlm || ctx.llm,
+          targetDesc: targetDesc.slice(0, 120),
+        });
+        if (!v.ok) {
+          emit({ kind: "attempt", action, reason: "视觉不可用: " + v.reason, ok: false, attempt });
+          emit({ kind: "outcome", outcome: "exhausted" });
+          return notOk("Vision fallback failed: " + v.reason);
+        }
+        ctx.recoveryHistory = ctx.recoveryHistory || [];
+        ctx.recoveryHistory.push("vision_locate");
+        ctx.lastVisionHint = v;
+        if (!v.visible) {
+          emit({ kind: "attempt", action, reason: "视觉确认目标不可见: " + v.reason, ok: false, attempt });
+          emit({ kind: "outcome", outcome: "exhausted" });
+          return notOk("Vision confirms target not visible: " + v.reason);
+        }
+        // Visible but DOM missed it: retry the snapshot once more after a beat.
+        await sleep(600);
+        emit({ kind: "attempt", action, reason: "视觉确认可见，重试快照: " + v.reason, ok: true, attempt });
+        return okFor;
+      }
 
     default:
       emit({ kind: "outcome", outcome: "exhausted" });

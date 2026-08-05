@@ -46,6 +46,21 @@ const createOpenAIAdapter = (settings) => {
     async generate(messages, opts = {}) {
       const body = { model, messages, temperature: 0.2 };
       if (opts.tools && opts.tools.length) body.tools = opts.tools;
+      if (opts.images && opts.images.length) {
+        // Attach base64 screenshots to the last user message (multimodal fallback).
+        for (let i = 0; i < messages.length; i++) {
+          const m = messages[i];
+          if (m.role !== "user") continue;
+          const text = typeof m.content === "string" ? m.content : "";
+          body.messages[i] = {
+            role: "user",
+            content: [
+              { type: "text", text },
+              ...opts.images.map((url) => ({ type: "image_url", image_url: { url } })),
+            ],
+          };
+        }
+      }
       const data = await post(body);
       const msg = data.choices && data.choices[0] && data.choices[0].message;
       if (!msg) throw new Error("LLM response missing choices");

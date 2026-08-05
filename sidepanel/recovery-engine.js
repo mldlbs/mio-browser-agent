@@ -20,36 +20,34 @@ function runRecovery(context) {
   const history = context.recoveryHistory || [];
 
   // 获取允许的恢复动作
-  const allowed = _getAllowedActions(context.lastError?.code || "ELEMENT_NOT_FOUND");
+  const policy = context.policy || recoveryPolicyMod.DEFAULT_RECOVERY_POLICY;
+  const allowed = _getAllowedActions(context.lastError?.code || "ELEMENT_NOT_FOUND", policy);
 
   if (allowed.length === 0) {
     return Promise.resolve(_createRecoveryResult("finish", false, "finish", { reason: "no_allowed_actions" }));
   }
 
   // 检查是否超过最大尝试次数
-  if (attempt >= context.maxRecoveryAttempts) {
+  if (attempt >= maxAttempts) {
     return Promise.resolve(_createRecoveryResult("finish", false, "finish", { reason: "max_attempts_exceeded" }));
   }
 
-  // 选择优先级最高的动作（已经按 priority 降序排序）
-  const candidate = allowed[0];
+  // 按每动作 maxAttempts 过滤：已用满的恢复动作不再参与
+  const candidates = allowed.filter((a) => {
+    const used = history.filter((h) => h === a.action).length;
+    const perActionMax = _getMaxAttemptsForAction(errorCode, a.action, policy);
+    return used < perActionMax;
+  });
 
-  // 检查连续相同动作
-  if (context.recoveryHistory.length > 0) {
-    const lastAction = context.recoveryHistory[context.recoveryHistory.length - 1];
-    if (lastAction === candidate.action) {
-      // 连续相同，尝试下一个优先级
-      const nextCandidate = allowed[1];
-      if (!nextCandidate) {
-        return Promise.resolve(_createRecoveryResult("finish", false, "finish", { reason: "duplicate_recovery_no_alternative" }));
-      }
-      // 使用下一个候选
-      return Promise.resolve(_createRecoveryResult("retry", true, "act", { action: nextCandidate.action, reason: "avoid_duplicate" }));
-    }
+  if (candidates.length === 0) {
+    return Promise.resolve(_createRecoveryResult("finish", false, "finish", { reason: "all_actions_exhausted" }));
   }
 
-  // 返回选中的恢复动作
-  return Promise.resolve(_createRecoveryResult("retry", true, "act", { action: candidate.action }));
+  // 避免连续相同动作；若最高优先级与上次相同则选下一个未用满的动作
+  const lastAction = history[history.length - 1];
+  const pick = candidates.find((c) => c.action !== lastAction) || candidates[0];
+
+  return Promise.resolve(_createRecoveryResult("retry", true, "act", { action: pick.action }));
 }
 
 if (typeof module !== "undefined") {

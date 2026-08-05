@@ -917,6 +917,84 @@ function assertEq(got, want, name) {
   );
   assert(failProg.some((e) => e.status === "failed"), "progress emits failed on step failure");
 
+  // ── vision fallback ──
+  const visionMod = require("../sidepanel/vision.js");
+  const vp = visionMod.buildVisionPrompt("登录按钮");
+  assert(vp.includes("登录按钮"), "vision prompt embeds target description");
+  assert(visionMod.parseVisionAnswer("在页面顶部，登录按钮可见").visible, "vision parses visible target");
+  assert(!visionMod.parseVisionAnswer("未找到，目标不可见").visible, "vision parses invisible target");
+  assert(!visionMod.parseVisionAnswer("被弹窗遮挡").visible, "vision parses occlusion");
+  const vBridge = {
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const vLlm = { generate: async (msgs, opts) => { assert(opts.images && opts.images.length === 1, "vision passes screenshot to llm"); return { content: "登录按钮在页面中部，可见" }; } };
+  const vRes = await visionMod.runVisionFallback({ bridge: vBridge, llm: vLlm, targetDesc: "登录按钮" });
+  assert(vRes.ok && vRes.visible && vRes.imageUsed, "vision fallback succeeds with screenshot");
+  const vNoCap = await visionMod.runVisionFallback({ bridge: { capture: async () => null }, llm: vLlm, targetDesc: "x" });
+  assert(!vNoCap.ok, "vision fallback degrades when capture unavailable");
+  const vErr = await visionMod.runVisionFallback({ bridge: { capture: async () => { throw new Error("perm"); } }, llm: vLlm, targetDesc: "x" });
+  assert(!vErr.ok && vErr.reason.includes("perm"), "vision fallback degrades on capture error");
+
+  // policy gains vision_locate last resort only when enabled
+  const policyMod = require("../sidepanel/recovery-policy.js");
+  assert(!policyMod.getAllowedActions("ELEMENT_NOT_FOUND", policyMod.DEFAULT_RECOVERY_POLICY).some((a) => a.action === "vision_locate"), "default policy has no vision");
+  const vpPolicy = policyMod.withVisionFallback();
+  const vpActions = policyMod.getAllowedActions("ELEMENT_NOT_FOUND", vpPolicy);
+  assert(vpActions.some((a) => a.action === "vision_locate"), "withVisionFallback appends vision_locate");
+  const vpFinish = vpActions.findIndex((a) => a.action === "finish");
+  const vpVision = vpActions.findIndex((a) => a.action === "vision_locate");
+  assert(vpVision > -1 && vpVision < vpFinish, "vision_locate sits above finish (last resort before giving up)");
+
+  // executor runs vision_locate as last resort when enabled: DOM retries exhaust, then vision
+  const visionEvents = [];
+  const visionLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover scroll_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover vision_locate
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }), // turn5 → succeed
+  ]);
+  const visionBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const visionRuntimeLlm = { generate: async (msgs, opts) => ({ content: "目标元素在页面中部，可见" }) };
+  const vExec = await executorMod.executeStep(
+    { description: "点不存在元素" },
+    {
+      llm: visionLlm, bridge: visionBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => visionEvents.push(ev),
+      enableVision: true, history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点不存在元素" }] }, goal: "g",
+      maxTurns: 6, maxRecoveryAttempts: 2, isStopped: () => false,
+      visionLlm: visionRuntimeLlm, // injected for the vision pass
+    }
+  );
+  assert(vExec.ok && vExec.summary === "ok", "enabled vision recovery lets the step succeed");
+  assert(visionEvents.some((e) => e.action === "vision_locate"), "vision_locate recovery event emitted");
+
+  // vision disabled: never selects vision_locate, step still fails after DOM exhaustion
+  const noVisionEvents = [];
+  const noVisionLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }),
+  ]);
+  const nvExec = await executorMod.executeStep(
+    { description: "点不存在元素" },
+    {
+      llm: noVisionLlm, bridge: visionBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => noVisionEvents.push(ev),
+      enableVision: false, history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点不存在元素" }] }, goal: "g",
+      maxTurns: 6, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(!nvExec.ok, "vision disabled still fails the step");
+  assert(!noVisionEvents.some((e) => e.action === "vision_locate"), "vision_locate never runs when disabled");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
