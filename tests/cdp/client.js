@@ -70,7 +70,7 @@ function connect(wsUrl, options = {}) {
   });
 }
 
-async function getBrowserWsUrl(port, tries = 50) {
+async function getBrowserWsUrl(port, tries = 150) {
   for (let i = 0; i < tries; i++) {
     try {
       const resp = await fetch(`http://127.0.0.1:${port}/json/version`);
