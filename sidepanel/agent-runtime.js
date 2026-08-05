@@ -1,4 +1,4 @@
-function createAgentRuntime({ settings, bridge, onLog = () => {}, onState = () => {}, deps = {} }) {
+function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = () => {}, onState = () => {}, deps = {} }) {
   const llm = deps.llm || createAdapter(settings);
   const memory = createMemory();
   let stopRequested = false;
@@ -11,7 +11,7 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onState = () =
       onLog("plan", planDoc.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
       onState("running");
       const result = await executor.execute(planDoc, {
-        llm, bridge, memory, onLog,
+        llm, bridge, memory, onLog, onRecovery,
         getTool, getToolsSchema,
         replan: (goal2, step) => planner.replan(goal2, step, llm),
         maxTurns: deps.maxTurns || 8,

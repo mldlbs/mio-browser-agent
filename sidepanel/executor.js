@@ -203,11 +203,15 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
     capabilities: { vision: false, planner: false, ocr: false }
   };
 
+  const emit = (ev) => ctx.onRecovery && ctx.onRecovery(ev);
+  emit({ kind: "error", stepId: ctx.currentStepId, code: errorCode, message: errorDetails?.message || errorCode });
+
   // Run recovery engine
   const recoveryResult = await _runRecovery(recoveryContext);
 
   // Recovery finished - report failure for this step
   if (recoveryResult.status === "finish") {
+    emit({ kind: "outcome", outcome: "exhausted" });
     return { ok: false, error: "Recovery exhausted", errorCode: "RECOVERY_EXHAUSTED" };
   }
 
@@ -215,34 +219,43 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
   const action = recoveryResult.detail?.action;
 
   // Execute recovery action
+  const attempt = (ctx.recoveryAttempts || 0) + 1;
+  const okFor = { ok: true };
+  const notOk = (msg) => ({ ok: false, error: msg, errorCode: "RECOVERY_EXHAUSTED" });
+
   switch (action) {
     case "retry_snapshot":
       // Just continue to next turn (will fetch new snapshot)
-      ctx.recoveryAttempts = (ctx.recoveryAttempts || 0) + 1;
+      ctx.recoveryAttempts = attempt;
       ctx.recoveryHistory = ctx.recoveryHistory || [];
       ctx.recoveryHistory.push("retry_snapshot");
-      return { ok: true };
+      emit({ kind: "attempt", action, reason: recoveryResult.detail?.reason || "重新获取页面快照", ok: true, attempt });
+      return okFor;
 
     case "scroll_and_retry":
       // Scroll then retry
       await scrollPage(ctx.bridge, 0.8);
-      ctx.recoveryAttempts = (ctx.recoveryAttempts || 0) + 1;
+      ctx.recoveryAttempts = attempt;
       ctx.recoveryHistory = ctx.recoveryHistory || [];
       ctx.recoveryHistory.push("scroll_and_retry");
-      return { ok: true };
+      emit({ kind: "attempt", action, reason: recoveryResult.detail?.reason || "滚动页面后重试", ok: true, attempt });
+      return okFor;
 
     case "finish":
-      return { ok: false, error: "Recovery exhausted", errorCode: "RECOVERY_EXHAUSTED" };
+      emit({ kind: "outcome", outcome: "exhausted" });
+      return notOk("Recovery exhausted");
 
     case "wait_and_retry":
       await sleep(1000);
-      ctx.recoveryAttempts = (ctx.recoveryAttempts || 0) + 1;
+      ctx.recoveryAttempts = attempt;
       ctx.recoveryHistory = ctx.recoveryHistory || [];
       ctx.recoveryHistory.push("wait_and_retry");
-      return { ok: true };
+      emit({ kind: "attempt", action, reason: recoveryResult.detail?.reason || "等待后重试", ok: true, attempt });
+      return okFor;
 
     default:
-      return { ok: false, error: `Unknown recovery action: ${action}` };
+      emit({ kind: "outcome", outcome: "exhausted" });
+      return notOk(`Unknown recovery action: ${action}`);
   }
 }
 

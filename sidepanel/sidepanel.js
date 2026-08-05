@@ -87,6 +87,8 @@ async function clearHistory() {
 
 async function historyLog(goal) {
   if (!currentTask) return;
+  const evRendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
+  if (evRendered) currentTask.logs.push({ tag: "recover", text: evRendered, ts: Date.now() });
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
   await HistoryModule.addHistoryRecord(currentTask);
   currentTask = null;
@@ -180,6 +182,7 @@ async function startTask() {
     recoveries: 0,
     replans: 0,
     logs: [],
+    recoveryEvents: RecoveryEventsModule.startEvents(),
   };
 
   runtime = createAgentRuntime({
@@ -191,6 +194,19 @@ async function startTask() {
         currentTask.logs.push({ tag, text, ts: Date.now() });
         if (tag === "result") currentTask.summary = text;
       }
+    },
+    onRecovery: (ev) => {
+      if (!currentTask) return;
+      RecoveryEventsModule.addEvent(currentTask.recoveryEvents, ev);
+      const rendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
+      appendLog("recover", rendered.split("\n")[0] || "恢复");
+      const msg = document.createElement("div");
+      msg.className = "recovery-event";
+      const pre = document.createElement("pre");
+      pre.textContent = rendered;
+      msg.appendChild(pre);
+      $("log").appendChild(msg);
+      $("log").scrollTop = $("log").scrollHeight;
     },
     onState: (state) => setStatus(state),
     deps: { maxSteps: settings.maxSteps || 30 },

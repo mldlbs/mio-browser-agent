@@ -650,17 +650,38 @@ function assertEq(got, want, name) {
     () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // element missing → ELEMENT_NOT_FOUND
     () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }),
   ]);
+  const recEvents = [];
   const recRes = await executorMod.execute(
     { goal: "g", steps: [{ description: "点按钮" }] },
     {
       llm: recLlm, bridge: execBridge, memory: memoryMod.createMemory(),
       getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
-      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      onLog: () => {}, onRecovery: (ev) => recEvents.push(ev),
+      replan: async () => { throw new Error("no replan"); },
       maxTurns: 4, maxStepRetries: 3, maxRecoveryAttempts: 2, isStopped: () => false,
     }
   );
   assert(recRes.ok, "retry_snapshot recovery lets a transient missing-element step succeed");
   assert(recRes.summary === "done", "retry_snapshot recovery reaches finish on the follow-up turn");
+  assert(recEvents.some((e) => e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "recovery emits error event with code");
+  assert(recEvents.some((e) => e.kind === "attempt" && e.action === "retry_snapshot"), "recovery emits retry_snapshot attempt event");
+
+  // ── recovery-events: structured stream + renderer ──
+  const revMod = require("../sidepanel/recovery-events.js");
+  const evs = revMod.startEvents();
+  revMod.addEvent(evs, { kind: "error", stepId: 3, code: "ELEMENT_NOT_FOUND", message: "未找到元素" });
+  revMod.addEvent(evs, { kind: "attempt", action: "retry_snapshot", reason: "重新获取页面快照", ok: true, attempt: 1 });
+  revMod.addEvent(evs, { kind: "attempt", action: "scroll_and_retry", ok: false, attempt: 2 });
+  revMod.addEvent(evs, { kind: "outcome", outcome: "exhausted" });
+  assertEq(evs.errorCode, "ELEMENT_NOT_FOUND", "events records error code");
+  assertEq(evs.attempts.length, 2, "events records all attempts");
+  assertEq(evs.outcome, "exhausted", "events records final outcome");
+  const rendered = revMod.renderEventStream(evs);
+  assert(rendered.includes("[步骤 3] ❌ ELEMENT_NOT_FOUND"), "render shows step + error");
+  assert(rendered.includes("✓ retry_snapshot"), "render marks successful attempt");
+  assert(rendered.includes("✗ scroll_and_retry"), "render marks failed attempt");
+  assert(rendered.includes("恢复用尽"), "render shows exhausted outcome");
+  assertEq(revMod.renderEventStream(revMod.startEvents()), "", "empty events render empty");
 
   // scroll_and_retry: attempt 2 avoids duplicate retry_snapshot → issues scroll (delta capped at 800px)
   let scrolled = null;

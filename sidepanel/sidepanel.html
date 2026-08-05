@@ -257,6 +257,26 @@
     .log-line.t-llm .tag { color: var(--overlay); }
     .log-line.t-debug .tag { color: var(--overlay); opacity: .7; }
     .log-line.t-trace .tag { color: var(--teal); }
+    .log-line.t-recover .tag { color: var(--pink); }
+
+    /* recovery transparency event card */
+    .recovery-event {
+      margin: 4px 6px;
+      padding: 8px 10px;
+      background: linear-gradient(120deg, rgba(245,194,231,.08), rgba(245,194,231,.02));
+      border: 1px solid rgba(245,194,231,.3);
+      border-radius: 10px;
+      animation: rise .3s ease;
+    }
+    .recovery-event pre {
+      margin: 0;
+      font-family: inherit;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--subtext);
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
 
     /* history view */
     .history-view {
@@ -421,6 +441,7 @@
   <script src="../common/protocol.js"></script>
   <script src="../common/storage.js"></script>
   <script src="../common/history.js"></script>
+  <script src="recovery-events.js"></script>
   <script src="../llm/adapter.js"></script>
   <script src="../llm/openai.js"></script>
   <script src="../tools/registry.js"></script>
