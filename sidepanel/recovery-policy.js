@@ -19,6 +19,11 @@ const DEFAULT_RECOVERY_POLICY = {
     { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
     { action: "scroll_and_retry", priority: 70, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
+  ],
+  SEND_NOT_VERIFIED: [
+    { action: "wait_and_retry", priority: 90, maxAttempts: 2 },
+    { action: "retry_snapshot", priority: 80, maxAttempts: 1 },
+    { action: "finish", priority: 10, maxAttempts: 1 }
   ]
 };
 

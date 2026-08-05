@@ -19,6 +19,7 @@ const visionMod = typeof module !== "undefined"
   ? require("./vision.js")
   : globalThis.VisionModule;
 const _runVisionFallback = visionMod ? visionMod.runVisionFallback : null;
+const _runSendConfirm = visionMod ? visionMod.runSendConfirm : null;
 
 // AGENT_PROMPT and buildSystemPrompt
 const AGENT_PROMPT = `You are a web automation agent operating in the user's Chrome browser.
@@ -43,7 +44,7 @@ Use tools to manipulate the page. Rules:
 - Links show their destination after '→'. On shopping/search pages prefer product-card links (e.g. href containing /item/, /dp/, /product/) over shop or category links (e.g. /store/, /shop/, /seller/). Avoid clicking a shop link when you want a product.
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
-- After clicking a submit/send button, WAIT for the page to respond (new message, loading indicator, navigation) before doing anything else. Do NOT click the same button twice — a repeated click on a send button re-submits the same input and can double-send. If a click result is uncertain, verify via the snapshot instead of clicking again.
+- After clicking a submit/send button, WAIT for the page to respond (new message, loading indicator, navigation) before doing anything else. Do NOT click the same button twice — a repeated click on a send button re-submits the same input and can double-send. If a click result is uncertain, verify via the snapshot instead of clicking again. The system automatically verifies send clicks (input cleared / new message / vision confirm); a "发送未确认" error means the send did NOT go through — retry the send, or type again and press the send control, instead of assuming it worked.
 - Icon-only buttons (e.g. named "图标按钮(输入框右下)") have no visible label. When you need to submit/send, pick the icon button annotated as beside/below the textbox you just typed into (look for "输入框右下"/"输入框下"/"输入框旁") — the send control sits at the bottom-right of the chat input. Do not click random icon buttons elsewhere on the page.
 - You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
 - After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).`;
@@ -181,8 +182,40 @@ async function executeStep(step, ctx) {
       }
       
       ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
-      onLog("tool", `${tc.name} → ${result.ok ? (result.value || "ok") : "ERR " + result.error}`);
+      const shown = result.value == null ? "ok" : (typeof result.value === "string" ? result.value.slice(0, 120) : JSON.stringify(result.value).slice(0, 120));
+      onLog("tool", `${tc.name} → ${result.ok ? shown : "ERR " + result.error}`);
       
+      // ── Send verification loop ──
+      // A send click can silently no-op (disabled send button / editor-state
+      // desync) while the tool still reports ok. For send-type buttons verify the
+      // click actually worked: DOM signals (input cleared / url changed / new
+      // elements) first, then vision confirm as the last resort. Unverified sends
+      // become SEND_NOT_VERIFIED and flow through recovery.
+      // Runs BEFORE the flag update below so it can read ctx._lastTyped.
+      let sendVerifiedOk = null; // undefined=not a send click, true/false=result
+      if (tc.name === "click" && result.ok && ctx._lastTyped && ctx.lastSnapshot && (tc.args && typeof tc.args.index === "number")) {
+        const target = ctx.lastSnapshot.elements[tc.args.index];
+        if (target && isSendTarget(target)) {
+          const verify = await verifySend(ctx, target);
+          if (!verify.ok) {
+            onLog("tool", `click → 发送未确认 (${verify.how}): ${verify.reason || "DOM 无变化"}`);
+            const errResult = { ok: false, error: "send not verified: " + (verify.reason || verify.how), errorCode: "SEND_NOT_VERIFIED" };
+            // Replace this tool call's result in history (don't duplicate same id).
+            ctx.history.pop();
+            ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(errResult) });
+            for (let j = i + 1; j < toolCalls.length; j++) {
+              ctx.history.push({ role: "tool", tool_call_id: toolCalls[j].id, content: JSON.stringify({ ok: false, error: "skipped after send verification failed" }) });
+            }
+            const recoveryResult = await handleRecovery(ctx, "SEND_NOT_VERIFIED", { message: errResult.error });
+            if (!recoveryResult.ok) return recoveryResult;
+            break; // next turn, fresh snapshot
+          }
+          onLog("tool", `click → 发送已确认 (${verify.how})`);
+          ctx._lastSendVerified = true;
+          sendVerifiedOk = true;
+        }
+      }
+
       if (result.ok) {
         // Track the last successful click target so a duplicate click in the next
         // round is short-circuited (prevents double-submitting on chat pages).
@@ -192,8 +225,17 @@ async function executeStep(step, ctx) {
           // A successful non-click action breaks the "no intervening action" chain.
           ctx._lastClick = null;
         }
+        // Remember we typed into a textbox, so the next send-button click is
+        // verified (did the message actually get sent?).
+        if (tc.name === "type" && result.ok) {
+          ctx._lastTyped = true;
+        } else if (tc.name === "click" && sendVerifiedOk === true) {
+          // Only a VERIFIED send click consumes the "just typed" flag. A failed
+          // verification (or a non-send click) keeps it so the retry is re-verified.
+          ctx._lastTyped = false;
+        }
       }
-      
+
       if (!result.ok) {
         // Tool exceptions fail immediately (not recoverable)
         if (result.errorCode === "TOOL_EXCEPTION") {
@@ -340,6 +382,66 @@ function clickTargetKey(args) {
   if (typeof idx === "number") return "index:" + idx;
   if (args && (args.selector || args.cssPath || args.xpath)) return "sel:" + (args.selector || args.cssPath || args.xpath);
   return null;
+}
+
+// Heuristic: does this snapshot element look like a send/submit control that
+// should be verified after clicking? Matches send/submit/发送 named buttons and
+// icon buttons annotated as being near a textbox (the chat-send control shape).
+function isSendTarget(el) {
+  if (!el) return false;
+  const n = (el.name || "").toLowerCase();
+  if (/(发送|提交|send|submit|发送消息)/.test(n)) return true;
+  // Icon button annotated with its position relative to the input (输入框…).
+  if (/图标/.test(el.name || "") && /输入框/.test(el.name || "") && el.role === "button") return true;
+  return false;
+}
+
+// Verify that a send click actually worked. Returns { ok, how, reason }.
+// 1) DOM signals: the typed textbox got cleared, url changed, or new elements
+//    appeared. 2) If ambiguous, ask the vision model (runSendConfirm) whether
+//    the input was cleared / a new user message appeared.
+async function verifySend(ctx, target) {
+  const bridge = ctx.bridge;
+  try {
+    // Give the page a beat to process the click (send → async request).
+    await sleep(1500);
+    const after = await safeSnapshot(bridge);
+    const before = ctx.lastSnapshot || {};
+    const beforeBox = before.elements || [];
+    const afterBox = after.elements || [];
+
+    // Signal 1: the textbox we typed into is now empty (classic send-clear).
+    const typedCleared = beforeBox.some((e) => {
+      if (e.role !== "textbox" && e.role !== "combobox") return false;
+      if (!e.value || !e.value.trim()) return false;
+      const match = afterBox.find((a) => a.role === e.role && a.name === e.name);
+      return !match || !match.value || !match.value.trim();
+    });
+    if (typedCleared) return { ok: true, how: "输入框已清空", reason: "" };
+
+    // Signal 2: navigation happened (form submit / page change).
+    if (after.url && before.url && after.url !== before.url) {
+      return { ok: true, how: "URL 已变化", reason: "" };
+    }
+
+    // Signal 3: the page gained meaningful new content (new message rows).
+    const grew = afterBox.length > beforeBox.length + 2;
+    if (grew) return { ok: true, how: "页面新增元素", reason: "" };
+
+    // Ambiguous by DOM: vision is the last word when enabled.
+    if (ctx.enableVision && _runSendConfirm) {
+      const v = await _runSendConfirm({ bridge, llm: ctx.visionLlm || ctx.llm });
+      if (v.ok) {
+        if (v.sent) return { ok: true, how: "视觉确认已发送", reason: v.reason };
+        return { ok: false, how: "视觉确认未发送", reason: v.reason };
+      }
+      return { ok: false, how: "视觉不可用", reason: v.reason };
+    }
+
+    return { ok: false, how: "DOM 无变化", reason: "点击后输入框未清空、URL 未变、无新增元素" };
+  } catch (e) {
+    return { ok: false, how: "验证异常", reason: (e && e.message) || String(e) };
+  }
 }
 
 async function scrollPage(bridge, ratio = 0.8, viewportHeight) {

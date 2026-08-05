@@ -12,25 +12,62 @@ function setNativeValue(el, value) {
   return { ok: true };
 }
 
-function setContentEditable(el, text) {
-  el.textContent = text;
-  // Real InputEvent lets ProseMirror/React-rich editors sync their internal state.
-  // Keep the plain input event too, for simpler contenteditables that read textContent.
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+// Set contenteditable text the way real browsers do: focus + place caret +
+// execCommand("insertText"). This fires the native beforeinput/input pipeline
+// that ProseMirror/React rich editors sync their INTERNAL state from. Plain
+// textContent writes leave that state stale, which keeps send/submit buttons
+// disabled and makes el.click() a silent no-op (the root cause of "typed but
+// message never sent" on chat sites).
+function setContentEditable(el, text, clear) {
   try {
-    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
-    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    el.focus();
+    const sel = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    if (clear) {
+      document.execCommand("delete");
+      document.execCommand("insertText", false, String(text));
+    } else {
+      // Caret to end, then insert so the editor appends like a user typing.
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand("insertText", false, String(text));
+    }
+    // execCommand already fires input; dispatch one more for editors that only
+    // listen to the plain input event.
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    return { ok: true };
   } catch (_) {
-    el.dispatchEvent(new Event("input", { bubbles: true, inputType: "insertText", data: text }));
+    // Fallback: textContent write + manual InputEvent (older editors).
+    if (clear) el.textContent = "";
+    el.textContent = (el.textContent || "") + text;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    try {
+      el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    } catch (_) {
+      el.dispatchEvent(new Event("input", { bubbles: true, inputType: "insertText", data: text }));
+    }
+    return { ok: true };
   }
 }
 
 function doClick(el, clickCount) {
+  // A disabled button swallows .click() silently. Report it as a real error so
+  // the recovery engine can act (retry snapshot / vision) instead of pretending
+  // the send succeeded — this was the silent "clicked but nothing happened".
+  if (el.disabled || el.getAttribute("aria-disabled") === "true" || el.getAttribute("disabled") != null) {
+    return { ok: false, error: "element is disabled (aria/disabled); likely internal editor state not synced", errorCode: "ELEMENT_DISABLED" };
+  }
   if (clickCount > 1) {
     el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, view: window }));
   } else {
     el.click();
   }
+  return { ok: true, value: `clicked ${el.tagName.toLowerCase()}` };
 }
 
 function executeAction(action) {
@@ -57,14 +94,14 @@ function executeAction(action) {
   const el = locateElement(target);
   if (!el) return { ok: false, error: "element not found by locator" };
   if (name === "click") {
-    doClick(el, args.clickCount || 1);
+    const res = doClick(el, args.clickCount || 1);
+    if (!res.ok) return res;
     return { ok: true, value: `clicked ${target.name}` };
   }
   if (name === "type") {
     el.focus();
     if (el.isContentEditable) {
-      if (args.clear) el.textContent = "";
-      setContentEditable(el, el.textContent + args.text);
+      setContentEditable(el, args.text, !!args.clear);
     } else {
       if (args.clear) {
         const cleared = setNativeValue(el, "");
@@ -115,14 +152,7 @@ function pasteText(el, text, clear) {
   const wrapped = Array.isArray(text) ? text.join("\n") : String(text);
   el.focus();
   if (el.isContentEditable) {
-    el.textContent = clear ? wrapped : (el.textContent || "") + wrapped;
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    try {
-      el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertFromPaste", data: wrapped }));
-      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste", data: wrapped }));
-    } catch (_) {
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-    }
+    setContentEditable(el, wrapped, !!clear);
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true, value: `pasted ${wrapped.length} chars` };
   } else if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {

@@ -1114,6 +1114,105 @@ function assertEq(got, want, name) {
   assert(dupExec2.ok, "non-consecutive clicks still complete");
   assertEq(clickCalls2.filter((n) => n === "click").length, 2, "clicks separated by an action both execute");
 
+  // ── send verification loop ──
+  // A send click whose input is NOT cleared (message never sent) must be flagged
+  // SEND_NOT_VERIFIED and flow through recovery instead of silently "succeeding".
+  let sendCleared = false;
+  const sendSnap = () => ({ url: "u", title: "t", elements: [
+    { index: 0, role: "textbox", name: "输入框", value: sendCleared ? "" : "hello" },
+    { index: 1, role: "button", name: "图标按钮(输入框右下)" },
+  ] });
+  const sendEvents = [];
+  const sendBridge = {
+    snapshot: async () => sendSnap(),
+    executeAction: async (a) => {
+      if (a.name === "click") sendCleared = true; // send clears the input
+      return { ok: true, value: "did " + a.name };
+    },
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const sendLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("type", { index: 0, text: "hello" }), makeToolCall("click", { index: 1 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const sendExec = await executorMod.executeStep(
+    { description: "输入并发送" },
+    {
+      llm: sendLlm, bridge: sendBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => sendEvents.push(ev),
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "输入并发送" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(sendExec.ok, "verified send completes the step");
+  assert(sendEvents.some((e) => e.action === "wait_and_retry") === false, "no recovery needed when send verified");
+
+  // Send that does NOT clear the input (editor-state desync) → SEND_NOT_VERIFIED recovery.
+  const sendFailEvents = [];
+  const sendFailBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [
+      { index: 0, role: "textbox", name: "输入框", value: "hello" },
+      { index: 1, role: "button", name: "图标按钮(输入框右下)" },
+    ] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }), // click never clears input
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const sendFailLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("type", { index: 0, text: "hello" }), makeToolCall("click", { index: 1 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "sent anyway" })] }),
+  ]);
+  const sendFailExec = await executorMod.executeStep(
+    { description: "输入并发送" },
+    {
+      llm: sendFailLlm, bridge: sendFailBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => sendFailEvents.push(ev),
+      enableVision: false, history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "输入并发送" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(sendFailEvents.some((e) => e.action === "wait_and_retry"), "unverified send triggers recovery");
+  assert(!sendFailExec.ok || sendFailEvents.some((e) => e.action === "wait_and_retry"), "unverified send does not silently succeed");
+
+  // Send verification falls back to vision confirm when enabled and DOM is ambiguous.
+  const visEvents = [];
+  const visBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [
+      { index: 0, role: "textbox", name: "输入框", value: "hello" },
+      { index: 1, role: "button", name: "图标按钮(输入框右下)" },
+    ] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const visConfirmLlm = { generate: async (msgs, opts) => ({ content: "已发送，输入框已清空" }) };
+  const visLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("type", { index: 0, text: "hello" }), makeToolCall("click", { index: 1 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const visExec = await executorMod.executeStep(
+    { description: "输入并发送" },
+    {
+      llm: visLlm, bridge: visBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => visEvents.push(ev),
+      enableVision: true, visionLlm: visConfirmLlm,
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "输入并发送" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(visExec.ok, "vision-confirmed send completes the step");
+  assert(!visEvents.some((e) => e.action === "wait_and_retry"), "vision-confirmed send needs no recovery");
+
+  // ── parseSendConfirm unit checks ──
+  const visionMod2 = require("../sidepanel/vision.js");
+  assert(visionMod2.parseSendConfirm("已发送，消息发出去了").sent, "parseSendConfirm detects sent");
+  assert(!visionMod2.parseSendConfirm("未发送，输入框仍有文字").sent, "parseSendConfirm detects not-sent");
+  assert(visionMod2.buildSendConfirmPrompt().includes("已发送"), "send-confirm prompt asks for sent/not-sent");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
