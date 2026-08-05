@@ -2,6 +2,45 @@ const $ = (id) => document.getElementById(id);
 
 let runtime = null;
 let currentTask = null;
+let planProgress = { steps: [], done: [], failed: [], replanned: false };
+
+function resetPlanProgress() {
+  planProgress = { steps: [], done: [], failed: [], replanned: false };
+}
+
+function renderPlanPanel() {
+  const panel = $("planPanel");
+  if (!planProgress.steps.length) { panel.style.display = "none"; return; }
+  panel.style.display = "block";
+  panel.innerHTML = "";
+  const head = document.createElement("div");
+  head.className = "plan-head";
+  head.textContent = "执行计划" + (planProgress.replanned ? "（已重规划）" : "");
+  panel.appendChild(head);
+  const list = document.createElement("div");
+  list.className = "plan-steps";
+  planProgress.steps.forEach((desc, i) => {
+    const row = document.createElement("div");
+    const cls = planProgress.failed.includes(i) ? " failed"
+      : planProgress.done.includes(i) ? " done"
+      : i === planProgress.current ? " running"
+      : "";
+    row.className = "plan-step" + cls;
+    const num = document.createElement("span");
+    num.className = "plan-num";
+    num.textContent = planProgress.done.includes(i) ? "✓"
+      : planProgress.failed.includes(i) ? "✗"
+      : i === planProgress.current ? "▶"
+      : String(i + 1);
+    const label = document.createElement("span");
+    label.className = "plan-label";
+    label.textContent = desc;
+    row.appendChild(num);
+    row.appendChild(label);
+    list.appendChild(row);
+  });
+  panel.appendChild(list);
+}
 
 function appendLog(tag, text) {
   const log = $("log");
@@ -250,6 +289,8 @@ async function startTask(resume) {
   appendLog("user", goal);
   setStatus("planning", "running");
   $("start").disabled = true;
+  resetPlanProgress();
+  renderPlanPanel();
 
   currentTask = {
     id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
@@ -289,6 +330,27 @@ async function startTask(resume) {
       $("log").scrollTop = $("log").scrollHeight;
     },
     onCheckpoint: (cp) => { if (currentTask) currentTask.resume = cp; },
+    onProgress: (p) => {
+      if (!currentTask) return;
+      if (p.status === "replanned") {
+        planProgress.replanned = true;
+        planProgress.done = [];
+        planProgress.failed = [];
+        planProgress.current = 0;
+        planProgress.steps = p.steps;
+      } else if (p.status === "done") {
+        planProgress.steps = p.steps;
+        planProgress.done.push(p.currentIndex);
+        planProgress.current = p.currentIndex + 1;
+      } else if (p.status === "failed") {
+        planProgress.failed.push(p.currentIndex);
+        planProgress.current = p.currentIndex;
+      } else {
+        planProgress.steps = p.steps;
+        planProgress.current = p.currentIndex;
+      }
+      renderPlanPanel();
+    },
     onState: (state) => setStatus(state),
     deps: { maxSteps: settings.maxSteps || 30 },
   });

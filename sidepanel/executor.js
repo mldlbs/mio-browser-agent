@@ -324,6 +324,16 @@ async function execute(plan, ctx) {
 
   const buildResume = () => ({ goal: plan.goal, plan, nextStepIndex: current, lastSummary });
   const emitCheckpoint = () => { if (ctx.onCheckpoint) ctx.onCheckpoint(buildResume()); };
+
+  const emitProgress = (status, extra = {}) => {
+    if (!ctx.onProgress) return;
+    ctx.onProgress(Object.assign({
+      steps: plan.steps.map((s) => s.description),
+      currentIndex: current,
+      status, // "running" | "done" | "failed" | "replanned"
+      description: plan.steps[current] ? plan.steps[current].description : "",
+    }, extra));
+  };
   
   while (current < plan.steps.length) {
     if (ctx.isStopped && ctx.isStopped()) return { ok: false, error: "stopped by user", resume: buildResume() };
@@ -338,19 +348,23 @@ async function execute(plan, ctx) {
     runCtx.currentStep = step;
     
     ctx.onLog("step", `[${current + 1}/${plan.steps.length}] ${step.description}`);
+    emitProgress("running");
     const result = await executeStep(step, runCtx);
     
     if (result.ok) {
+      const doneIndex = current;
       current++;
       attemptsForStep = 0;
       runCtx.recoveryAttempts = 0;
       runCtx.recoveryHistory = [];
       if (result.summary) lastSummary = result.summary;
       ctx.onLog("step", "DONE: " + (result.summary || "完成"));
+      emitProgress("done", { summary: result.summary || "", currentIndex: doneIndex });
       emitCheckpoint();
       continue;
     }
     
+    emitProgress("failed", { error: result.error || "" });
     attemptsForStep++;
     if (attemptsForStep >= (ctx.maxStepRetries || 3)) {
       replans++;
@@ -368,6 +382,7 @@ async function execute(plan, ctx) {
       attemptsForStep = 0;
       runCtx.recoveryAttempts = 0;
       runCtx.recoveryHistory = [];
+      emitProgress("replanned");
     }
   }
   

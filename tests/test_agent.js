@@ -876,6 +876,47 @@ function assertEq(got, want, name) {
   assert(!stopRes.ok && stopRes.resume, "stop returns a resume token");
   assertEq(stopRes.resume.nextStepIndex, 1, "resume token points to the next unrun step");
 
+  // ── plan visualization: onProgress emits step lifecycle events ──
+  const progEvents = [];
+  const progLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "a" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "b" })] }),
+  ]);
+  const progRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "步a" }, { description: "步b" }] },
+    {
+      llm: progLlm, bridge: resumeBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      onProgress: (p) => progEvents.push(p),
+      maxTurns: 3, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(progRes.ok, "progress source run completes");
+  assertEq(progEvents.filter((e) => e.status === "running").length, 2, "progress emits running per step");
+  assertEq(progEvents.filter((e) => e.status === "done").length, 2, "progress emits done per completed step");
+  assert(progEvents.every((e) => e.steps && e.steps.length === 2), "progress carries full step list");
+  assertEq(progEvents[0].status, "running", "first progress event is running");
+  assertEq(progEvents[0].description, "步a", "running event names the step");
+  const doneFirst = progEvents.find((e) => e.status === "done");
+  assertEq(doneFirst.currentIndex, 0, "done event marks step index 0");
+
+  // progress after a failed step marks failed before replan
+  const failProg = [];
+  const failProgLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }),
+  ]);
+  await executorMod.execute(
+    { goal: "g", steps: [{ description: "z" }] },
+    {
+      llm: failProgLlm, bridge: execBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onProgress: (p) => failProg.push(p),
+      maxTurns: 2, maxStepRetries: 1, maxReplans: 1, isStopped: () => false,
+    }
+  );
+  assert(failProg.some((e) => e.status === "failed"), "progress emits failed on step failure");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
