@@ -14,8 +14,15 @@ function setNativeValue(el, value) {
 
 function setContentEditable(el, text) {
   el.textContent = text;
+  // Real InputEvent lets ProseMirror/React-rich editors sync their internal state.
+  // Keep the plain input event too, for simpler contenteditables that read textContent.
   el.dispatchEvent(new Event("input", { bubbles: true }));
-  el.dispatchEvent(new Event("input", { bubbles: true, inputType: "insertText", data: text }));
+  try {
+    el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
+    el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+  } catch (_) {
+    el.dispatchEvent(new Event("input", { bubbles: true, inputType: "insertText", data: text }));
+  }
 }
 
 function doClick(el, clickCount) {
@@ -109,6 +116,15 @@ function pasteText(el, text, clear) {
   el.focus();
   if (el.isContentEditable) {
     el.textContent = clear ? wrapped : (el.textContent || "") + wrapped;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    try {
+      el.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertFromPaste", data: wrapped }));
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertFromPaste", data: wrapped }));
+    } catch (_) {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return { ok: true, value: `pasted ${wrapped.length} chars` };
   } else if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
     if (clear) setNativeValue(el, wrapped);
     else setNativeValue(el, (el.value || "") + wrapped);

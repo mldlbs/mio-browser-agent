@@ -43,6 +43,7 @@ Use tools to manipulate the page. Rules:
 - Links show their destination after '→'. On shopping/search pages prefer product-card links (e.g. href containing /item/, /dp/, /product/) over shop or category links (e.g. /store/, /shop/, /seller/). Avoid clicking a shop link when you want a product.
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
+- After clicking a submit/send button, WAIT for the page to respond (new message, loading indicator, navigation) before doing anything else. Do NOT click the same button twice — a repeated click on a send button re-submits the same input and can double-send. If a click result is uncertain, verify via the snapshot instead of clicking again.
 - You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
 - After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).`;
 
@@ -64,6 +65,12 @@ async function executeStep(step, ctx) {
   const recoveryHandler = new _RecoveryTurnHandler();
   
   ctx.history[0] = { role: "system", content: buildSystemPrompt(ctx.goal, ctx.plan, step) };
+  
+  // Duplicate-click guard: an element just clicked with no intervening action must
+  // not be clicked again. Prevents the agent from double-sending on pages whose
+  // rich editors (ProseMirror/React) desync the DOM from their internal state.
+  if (ctx._lastClick === undefined) ctx._lastClick = null;
+  if (ctx._actionsSinceLastClick === undefined) ctx._actionsSinceLastClick = 0;
   
   // Turn-based execution
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -145,6 +152,18 @@ async function executeStep(step, ctx) {
         }
         return { ok: true, summary };
       }
+
+      // Duplicate-click guard: if the agent tries to click the exact same target
+      // again with no successful action in between, short-circuit it instead of
+      // letting the click land twice (common cause of double-submits).
+      if (tc.name === "click") {
+        const key = clickTargetKey(tc.args);
+        if (key && key === ctx._lastClick) {
+          ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: "duplicate click: this element was just clicked with no action in between; do not click it again — check the page instead" }) });
+          onLog("tool", `click → SKIPPED duplicate (${key})`);
+          continue;
+        }
+      }
       
       const tool = getTool(tc.name);
       if (!tool) {
@@ -162,6 +181,17 @@ async function executeStep(step, ctx) {
       
       ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
       onLog("tool", `${tc.name} → ${result.ok ? (result.value || "ok") : "ERR " + result.error}`);
+      
+      if (result.ok) {
+        // Track the last successful click target so a duplicate click in the next
+        // round is short-circuited (prevents double-submitting on chat pages).
+        if (tc.name === "click" && result.ok) {
+          ctx._lastClick = clickTargetKey(tc.args);
+        } else if (tc.name !== "click") {
+          // A successful non-click action breaks the "no intervening action" chain.
+          ctx._lastClick = null;
+        }
+      }
       
       if (!result.ok) {
         // Tool exceptions fail immediately (not recoverable)
@@ -300,6 +330,15 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
       emit({ kind: "outcome", outcome: "exhausted" });
       return notOk(`Unknown recovery action: ${action}`);
   }
+}
+
+// Unique key for a click target so duplicate clicks are detected across rounds.
+// Falls back to "index:" when the index is missing, or null if there is no target.
+function clickTargetKey(args) {
+  const idx = args && args.index;
+  if (typeof idx === "number") return "index:" + idx;
+  if (args && (args.selector || args.cssPath || args.xpath)) return "sel:" + (args.selector || args.cssPath || args.xpath);
+  return null;
 }
 
 async function scrollPage(bridge, ratio = 0.8, viewportHeight) {

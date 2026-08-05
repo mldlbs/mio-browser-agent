@@ -995,6 +995,56 @@ function assertEq(got, want, name) {
   assert(!nvExec.ok, "vision disabled still fails the step");
   assert(!noVisionEvents.some((e) => e.action === "vision_locate"), "vision_locate never runs when disabled");
 
+  // ── duplicate-click guard ──
+  // An agent that tries to click the same target twice with no intervening action
+  // must have the second click short-circuited (prevents double-submits).
+  const clickCalls = [];
+  const dupBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "send" }] }),
+    executeAction: async (a) => { clickCalls.push(a.name); return { ok: true, value: "did " + a.name }; },
+  };
+  const dupLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 }), makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const dupExec = await executorMod.executeStep(
+    { description: "点发送" },
+    {
+      llm: dupLlm, bridge: dupBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {},
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点发送" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(dupExec.ok, "duplicate-click guard still completes the step");
+  assertEq(clickCalls.filter((n) => n === "click").length, 1, "duplicate click short-circuited");
+
+  // A distinct later click (after a successful non-click action) is allowed.
+  const clickCalls2 = [];
+  const dupBridge2 = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "send" }] }),
+    executeAction: async (a) => { clickCalls2.push(a.name); return { ok: true, value: "did " + a.name }; },
+  };
+  const dupLlm2 = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 }), makeToolCall("wait", { ms: 500 }), makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const dupExec2 = await executorMod.executeStep(
+    { description: "点发送两次" },
+    {
+      llm: dupLlm2, bridge: dupBridge2, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {},
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点发送两次" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(dupExec2.ok, "non-consecutive clicks still complete");
+  assertEq(clickCalls2.filter((n) => n === "click").length, 2, "clicks separated by an action both execute");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
