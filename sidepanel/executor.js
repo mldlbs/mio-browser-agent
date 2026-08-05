@@ -221,13 +221,17 @@ async function executeStep(step, ctx) {
         // round is short-circuited (prevents double-submitting on chat pages).
         if (tc.name === "click" && result.ok) {
           ctx._lastClick = clickTargetKey(tc.args);
-        } else if (tc.name !== "click") {
-          // A successful non-click action breaks the "no intervening action" chain.
+        } else if (tc.name !== "click" && isStateChangingTool(tc.name)) {
+          // Only state-changing actions (type/paste/navigate/tab) break the
+          // "no intervening action" chain. Passive tools (wait, extract_text,
+          // scroll) do NOT clear the guard — a click-wait-click on the same
+          // target is still a duplicate and must be short-circuited.
           ctx._lastClick = null;
         }
         // Remember we typed into a textbox, so the next send-button click is
-        // verified (did the message actually get sent?).
-        if (tc.name === "type" && result.ok) {
+        // verified (did the message actually get sent?). Both type and paste
+        // feed the input, so both arm the send verification.
+        if ((tc.name === "type" || tc.name === "paste") && result.ok) {
           ctx._lastTyped = true;
         } else if (tc.name === "click" && sendVerifiedOk === true) {
           // Only a VERIFIED send click consumes the "just typed" flag. A failed
@@ -394,6 +398,13 @@ function isSendTarget(el) {
   // Icon button annotated with its position relative to the input (输入框…).
   if (/图标/.test(el.name || "") && /输入框/.test(el.name || "") && el.role === "button") return true;
   return false;
+}
+
+// Tools that mutate page/tab state. Only these break the duplicate-click guard;
+// passive tools (wait, extract_text, scroll, waitFor) leave it armed so a
+// click-wait-click on the same target is still detected as a duplicate.
+function isStateChangingTool(name) {
+  return name === "type" || name === "paste" || name === "navigate" || name === "tab" || name === "scroll";
 }
 
 // Verify that a send click actually worked. Returns { ok, how, reason }.

@@ -1090,7 +1090,10 @@ function assertEq(got, want, name) {
   assert(dupExec.ok, "duplicate-click guard still completes the step");
   assertEq(clickCalls.filter((n) => n === "click").length, 1, "duplicate click short-circuited");
 
-  // A distinct later click (after a successful non-click action) is allowed.
+  // A click separated from the previous one ONLY by a passive tool (wait) is
+  // still a duplicate — wait does not change page state, so the guard stays
+  // armed and the second click is short-circuited (prevents triple-sends where
+  // the agent interleaves waits between identical send clicks).
   const clickCalls2 = [];
   const dupBridge2 = {
     snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "send" }] }),
@@ -1111,8 +1114,36 @@ function assertEq(got, want, name) {
       maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
     }
   );
-  assert(dupExec2.ok, "non-consecutive clicks still complete");
-  assertEq(clickCalls2.filter((n) => n === "click").length, 2, "clicks separated by an action both execute");
+  assert(dupExec2.ok, "wait-interleaved clicks still complete");
+  assertEq(clickCalls2.filter((n) => n === "click").length, 1, "wait does not clear the duplicate guard (second click short-circuited)");
+
+  // A state-changing action (paste) between two clicks DOES clear the guard, so
+  // a later distinct click on the same target is allowed.
+  const clickCalls3 = [];
+  const dupBridge3 = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [
+      { index: 0, role: "button", name: "send" },
+      { index: 1, role: "textbox", name: "输入框" },
+    ] }),
+    executeAction: async (a) => { clickCalls3.push(a.name); return { ok: true, value: "did " + a.name }; },
+  };
+  const dupLlm3 = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 }), makeToolCall("paste", { index: 1, text: "hi" }), makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const dupExec3 = await executorMod.executeStep(
+    { description: "点发送两次" },
+    {
+      llm: dupLlm3, bridge: dupBridge3, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {},
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点发送两次" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(dupExec3.ok, "clicks separated by a state-changing action complete");
+  assertEq(clickCalls3.filter((n) => n === "click").length, 2, "state-changing action clears the guard (both clicks execute)");
 
   // ── send verification loop ──
   // A send click whose input is NOT cleared (message never sent) must be flagged
@@ -1176,6 +1207,38 @@ function assertEq(got, want, name) {
   );
   assert(sendFailEvents.some((e) => e.action === "wait_and_retry"), "unverified send triggers recovery");
   assert(!sendFailExec.ok || sendFailEvents.some((e) => e.action === "wait_and_retry"), "unverified send does not silently succeed");
+
+  // paste also arms the send verification (a paste→send flow is the common chat pattern).
+  const pasteSendEvents = [];
+  let pasteSendCleared = false;
+  const pasteSendBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [
+      { index: 0, role: "textbox", name: "输入框", value: pasteSendCleared ? "" : "长文本" },
+      { index: 1, role: "button", name: "图标按钮(输入框右下)" },
+    ] }),
+    executeAction: async (a) => {
+      if (a.name === "click") pasteSendCleared = true;
+      return { ok: true, value: "did " + a.name };
+    },
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const pasteSendLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("paste", { index: 0, text: "长文本" }), makeToolCall("click", { index: 1 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const pasteSendExec = await executorMod.executeStep(
+    { description: "粘贴并发送" },
+    {
+      llm: pasteSendLlm, bridge: pasteSendBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => pasteSendEvents.push(ev),
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "粘贴并发送" }] }, goal: "g",
+      maxTurns: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(pasteSendExec.ok, "paste+send verified completes the step");
+  assert(!pasteSendEvents.some((e) => e.action === "wait_and_retry"), "paste-armed send verification runs (no recovery when verified)");
 
   // Send verification falls back to vision confirm when enabled and DOM is ambiguous.
   const visEvents = [];
