@@ -138,7 +138,7 @@ function elementValue(el) {
   return "";
 }
 
-function scanRoot(root, framePath, shadowPath, elements, visited) {
+function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
   const candidates = Array.from(root.querySelectorAll(INTERACTIVE_SELECTOR));
   candidates.forEach((el) => {
     if (!isVisible(el)) return;
@@ -164,16 +164,19 @@ function scanRoot(root, framePath, shadowPath, elements, visited) {
       shadowPath: shadowPath || [],
     });
   });
-  // Recurse into same-origin iframes (cross-origin access throws).
-  Array.from(root.querySelectorAll("iframe")).forEach((iframe, fi) => {
-    let idoc;
-    try {
-      idoc = iframe.contentDocument;
-    } catch (_) { return; } // cross-origin: skip
-    if (!idoc || visited.has(idoc)) return;
-    visited.add(idoc);
-    scanRoot(idoc, (framePath || []).concat(fi), [], elements, visited);
-  });
+  // Recurse into same-origin iframes (cross-origin access throws). Skipped in
+  // frameOnly mode: the bridge enumerates every frame instead.
+  if (!opts || opts.frames !== false) {
+    Array.from(root.querySelectorAll("iframe")).forEach((iframe, fi) => {
+      let idoc;
+      try {
+        idoc = iframe.contentDocument;
+      } catch (_) { return; } // cross-origin: skip
+      if (!idoc || visited.has(idoc)) return;
+      visited.add(idoc);
+      scanRoot(idoc, (framePath || []).concat(fi), [], elements, visited, opts);
+    });
+  }
   // Recurse into open shadow roots (closed roots are inaccessible by design).
   let hosts;
   try {
@@ -195,6 +198,16 @@ function captureSnapshot() {
   return { url: location.href, title: document.title, timestamp: Date.now(), elements };
 }
 
+// Capture only the current frame's own document (no iframe recursion) — used
+// when the bridge enumerates every frame via webNavigation and merges results.
+function captureFrameSnapshot() {
+  const elements = [];
+  const visited = new Set();
+  visited.add(document);
+  scanRoot(document, [], [], elements, visited, { frames: false });
+  return { url: location.href, title: document.title, timestamp: Date.now(), elements };
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { captureSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath };
+  module.exports = { captureSnapshot, captureFrameSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath };
 }

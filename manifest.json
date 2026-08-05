@@ -1,21 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "mio",
+  "name": "Browser Agent",
   "version": "0.1.0",
-  "description": "自然语言驱动的浏览器 Agent：让幽灵般的助手替你在网页上点击、输入、提取内容。",
-  "permissions": ["activeTab", "scripting", "tabs", "sidePanel", "storage"],
+  "description": "自然语言驱动的网页自动化 Agent：点击、输入、滚动、导航、提取。",
+  "permissions": ["activeTab", "scripting", "tabs", "sidePanel", "storage", "webNavigation"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background/service-worker.js" },
-  "action": { "default_title": "mio" },
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  },
+  "action": { "default_title": "Browser Agent" },
   "side_panel": { "default_path": "sidepanel/sidepanel.html" },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
+      "all_frames": true,
       "js": [
         "common/protocol.js",
         "content/snapshot.js",

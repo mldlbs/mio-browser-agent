@@ -1,13 +1,13 @@
-window.__mioContentLoaded = (window.__mioContentLoaded || 0) + 1;
-try { if (document.documentElement) document.documentElement.setAttribute("data-mio-content", "1"); } catch (e) {}
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || !request.type) return;
   const payload = request.payload || {};
   try {
     switch (request.type) {
-      case MSG.SNAPSHOT_REQUEST:
-        sendResponse({ type: MSG.SNAPSHOT_RESPONSE, payload: { taskId: payload.taskId, snapshot: captureSnapshot() } });
+      case MSG.SNAPSHOT_REQUEST: {
+        const snap = payload.frameOnly ? captureFrameSnapshot() : captureSnapshot();
+        sendResponse({ type: MSG.SNAPSHOT_RESPONSE, payload: { taskId: payload.taskId, snapshot: snap } });
         return;
+      }
       case MSG.ACTION_EXECUTE: {
         const result = executeAction(payload.action);
         if (result && typeof result.then === "function") {

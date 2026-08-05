@@ -694,6 +694,51 @@ function assertEq(got, want, name) {
   );
   assert(!finRes.ok && finRes.errorCode === "RECOVERY_EXHAUSTED", "single silent turn with budget 1 finishes failed");
 
+  // ── bridge: merges snapshots across frames (same/cross-origin) via frameId ──
+  const fs = require("fs");
+  const vm = require("vm");
+  global.MSG = protocol.MSG;
+  global.make = protocol.make;
+  const sent = [];
+  const bridgeChrome = {
+    tabs: {
+      query: async () => [{ id: 1, url: "https://host.example/page" }],
+      sendMessage: async (tabId, msg, opts) => {
+        sent.push({ frameId: opts && opts.frameId, msg });
+        const fid = (opts && opts.frameId) || 0;
+        if (msg.type === MSG.SNAPSHOT_REQUEST) {
+          const elements = fid === 0
+            ? [{ role: "button", name: "主按钮", index: 0, framePath: [] }]
+            : [{ role: "textbox", name: "子输入框", index: 0, framePath: [] }];
+          return { type: MSG.SNAPSHOT_RESPONSE, payload: { snapshot: { title: "T", url: "u", elements } } };
+        }
+        if (msg.type === MSG.ACTION_EXECUTE) {
+          return { type: MSG.ACTION_RESULT, payload: { result: { ok: true, value: "done-in-frame-" + fid } } };
+        }
+        return null;
+      },
+    },
+    scripting: { executeScript: async () => {} },
+    webNavigation: { getAllFrames: async () => [{ frameId: 0, url: "https://host.example/page" }, { frameId: 5, url: "https://pay.example/checkout" }] },
+  };
+  global.chrome = bridgeChrome;
+  const bridgeSource = fs.readFileSync(require.resolve("../sidepanel/bridge.js"), "utf8");
+  vm.runInThisContext(bridgeSource);
+  const bridge = createPageBridge();
+  const brSnap = await bridge.snapshot();
+  assertEq(brSnap.elements.length, 2, "bridge merges main + sub-frame elements");
+  assertEq(brSnap.elements[0].frameId, 0, "main frame elements tagged frameId 0");
+  assertEq(brSnap.elements[1].frameId, 5, "cross-origin frame elements tagged with its frameId");
+  assertEq(brSnap.elements[1].index, 1, "merged element indices stay contiguous");
+  const actRes = await bridge.executeAction({ name: "click", target: { frameId: 5, name: "子输入框" } });
+  assertEq(actRes.value, "done-in-frame-5", "executeAction routes to target frameId");
+  const actMain = await bridge.executeAction({ name: "click", target: { name: "主按钮" } });
+  assertEq(actMain.value, "done-in-frame-0", "executeAction without frameId targets main frame");
+  assert(sent.some((s) => s.frameId === 5 && s.msg.type === MSG.SNAPSHOT_REQUEST), "snapshot requested per frameId");
+  delete global.MSG;
+  delete global.make;
+  delete global.chrome;
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();

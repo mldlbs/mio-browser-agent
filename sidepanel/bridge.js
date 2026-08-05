@@ -20,17 +20,18 @@ async function ensureContentScript(tabId) {
   await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_FILES });
 }
 
-async function sendToTab(type, payload) {
+async function sendToTab(type, payload, frameId) {
   const tab = await getActiveTab();
   const tabId = tab.id;
   const describe = () => `当前页面: ${tab.url || "(无法获取 URL)"}`;
+  const opts = frameId != null ? { frameId } : {};
   let res;
   try {
-    res = await chrome.tabs.sendMessage(tabId, make(type, payload));
+    res = await chrome.tabs.sendMessage(tabId, make(type, payload), opts);
   } catch (e) {
     try {
       await ensureContentScript(tabId);
-      res = await chrome.tabs.sendMessage(tabId, make(type, payload));
+      res = await chrome.tabs.sendMessage(tabId, make(type, payload), opts);
     } catch (e2) {
       throw new Error(`无法与页面通信，请刷新当前页面后重试 (${describe()} / ${e2 && e2.message || e.message})`);
     }
@@ -38,15 +39,51 @@ async function sendToTab(type, payload) {
   return res;
 }
 
+// Enumerate every frame (including cross-origin iframes) of the active tab.
+async function listFrames() {
+  const tab = await getActiveTab();
+  const frames = await chrome.webNavigation.getAllFrames({ tabId: tab.id });
+  return frames || [];
+}
+
 function createPageBridge() {
   return {
     async snapshot() {
-      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now() });
+      const frames = await listFrames();
+      const main = frames.find((f) => f.frameId === 0);
+      const mainTab = await getActiveTab();
+      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true });
       if (!res || res.type !== MSG.SNAPSHOT_RESPONSE) throw new Error("bad snapshot response");
-      return res.payload.snapshot;
+      const merged = {
+        url: (main && main.url) || mainTab.url || "",
+        title: res.payload.snapshot.title,
+        timestamp: Date.now(),
+        elements: [],
+      };
+      // frameOnly snapshot already covers the main document; reindex with frameId 0.
+      merged.elements = res.payload.snapshot.elements.map((e, i) => ({ ...e, index: i, frameId: 0 }));
+      // Collect each sub-frame (same- or cross-origin) independently.
+      for (const f of frames) {
+        if (f.frameId === 0) continue;
+        let fres;
+        try {
+          fres = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true }, f.frameId);
+        } catch (_) { continue; } // frame may have navigated away; skip it
+        if (!fres || fres.type !== MSG.SNAPSHOT_RESPONSE) continue;
+        const elems = fres.payload.snapshot.elements || [];
+        elems.forEach((e) => {
+          e.index = merged.elements.length;
+          e.frameId = f.frameId;
+          e.framePath = [];
+          merged.elements.push(e);
+        });
+      }
+      return merged;
     },
     async executeAction(action) {
-      const res = await sendToTab(MSG.ACTION_EXECUTE, { taskId: Date.now(), action });
+      const target = action.target || {};
+      const frameId = target.frameId;
+      const res = await sendToTab(MSG.ACTION_EXECUTE, { taskId: Date.now(), action }, frameId);
       if (!res || res.type !== MSG.ACTION_RESULT) throw new Error("bad action response");
       return res.payload.result;
     },
