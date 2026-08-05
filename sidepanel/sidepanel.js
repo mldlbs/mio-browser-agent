@@ -94,6 +94,10 @@ async function init() {
   $("apiKey").value = s.apiKey;
   $("maxSteps").value = s.maxSteps;
   $("enableVision").checked = !!s.enableVision;
+  const v = s.vision || {};
+  $("visionModel").value = v.model || "";
+  $("visionBaseUrl").value = v.baseURL || "https://open.bigmodel.cn/api/paas/v4";
+  $("visionApiKey").value = v.apiKey || "";
 
   $("saveSettings").addEventListener("click", async () => {
     await setSettings({
@@ -103,6 +107,12 @@ async function init() {
       apiKey: $("apiKey").value.trim(),
       maxSteps: parseInt($("maxSteps").value, 10) || 30,
       enableVision: !!$("enableVision").checked,
+      vision: {
+        provider: "openai",
+        model: $("visionModel").value.trim(),
+        baseURL: $("visionBaseUrl").value.trim() || "https://open.bigmodel.cn/api/paas/v4",
+        apiKey: $("visionApiKey").value.trim(),
+      },
     });
     toast("设置已保存");
   });
@@ -284,6 +294,12 @@ async function startTask(resume) {
     apiKey: $("apiKey").value.trim(),
     maxSteps: parseInt($("maxSteps").value, 10) || 30,
     enableVision: !!$("enableVision").checked,
+    vision: {
+      provider: "openai",
+      model: $("visionModel").value.trim(),
+      baseURL: $("visionBaseUrl").value.trim() || "https://open.bigmodel.cn/api/paas/v4",
+      apiKey: $("visionApiKey").value.trim(),
+    },
   };
   await setSettings(settings);
   if (!settings.apiKey) { toast("请先保存 API Key"); $("apiKey").focus(); return; }

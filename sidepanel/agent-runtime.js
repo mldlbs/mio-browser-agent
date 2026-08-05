@@ -3,6 +3,17 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
   const memory = createMemory();
   let stopRequested = false;
 
+  // Vision fallback uses its own adapter when the user configured a dedicated
+  // vision model; otherwise it reuses the main conversation model (legacy).
+  let visionLlm = null;
+  try {
+    const v = settings.vision || {};
+    if (v.model && v.apiKey) visionLlm = deps.visionLlm || createAdapter({ ...v, provider: v.provider || "openai" });
+    else visionLlm = deps.visionLlm || null;
+  } catch (_) {
+    visionLlm = deps.visionLlm || null;
+  }
+
   async function run(goal, resume) {
     onState("planning");
     onLog("plan", resume && resume.plan ? "继续上次任务…" : "开始规划…");
@@ -25,6 +36,7 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
         maxSteps: deps.maxSteps || 30,
         maxRecoveryAttempts: deps.maxRecoveryAttempts || 2,
         enableVision: !!settings.enableVision,
+        visionLlm,
         isStopped: () => stopRequested,
       });
       onState(result.ok ? "done" : "error");

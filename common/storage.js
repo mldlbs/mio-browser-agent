@@ -5,10 +5,24 @@ const DEFAULT_SETTINGS = {
   apiKey: "",
   maxSteps: 30,
   enableVision: false,
+  // 视觉兜底使用独立模型配置，与主对话模型完全分离。
+  // 留空则回退用主对话模型（行为同历史版本）。
+  vision: {
+    provider: "openai",
+    model: "",
+    baseURL: "https://open.bigmodel.cn/api/paas/v4",
+    apiKey: "",
+  },
 };
 
+function normalizeVision(v) {
+  return Object.assign({}, DEFAULT_SETTINGS.vision, v || {});
+}
+
 function normalizeSettings(s) {
-  return Object.assign({}, DEFAULT_SETTINGS, s || {});
+  const out = Object.assign({}, DEFAULT_SETTINGS, s || {});
+  out.vision = normalizeVision(out.vision);
+  return out;
 }
 
 async function getSettings() {

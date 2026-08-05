@@ -239,6 +239,12 @@ function assertEq(got, want, name) {
   const s = storage.normalizeSettings({ apiKey: "k" });
   assertEq(s.provider, "openai", "normalizeSettings provider default");
   assertEq(s.apiKey, "k", "normalizeSettings keeps apiKey");
+  const sv = storage.normalizeSettings({ vision: { model: "glm-4v-flash" } }).vision;
+  assertEq(sv.model, "glm-4v-flash", "normalizeSettings keeps vision model");
+  assertEq(sv.baseURL, "https://open.bigmodel.cn/api/paas/v4", "normalizeSettings vision baseURL default");
+  const svEmpty = storage.normalizeSettings({}).vision;
+  assertEq(svEmpty.model, "", "normalizeSettings vision model default empty (falls back to main)");
+  assertEq(svEmpty.provider, "openai", "normalizeSettings vision provider default");
 
   // ── history ──
   const histStore = {};
@@ -637,6 +643,29 @@ function assertEq(got, want, name) {
   rt2.stop();
   const rr2 = await rt2.run("x");
   assert(!rr2.ok, "agent-runtime respects stop before executing");
+
+  // vision model uses a dedicated adapter when settings.vision is configured
+  const seen = [];
+  const origAdapter = global.createAdapter;
+  global.createAdapter = (s) => { seen.push(s); return { generate: async () => ({ content: "", toolCalls: [] }) }; };
+  try {
+    runtimeMod.createAgentRuntime({
+      settings: { enableVision: true, vision: { provider: "openai", model: "glm-4v-flash", baseURL: "https://open.bigmodel.cn/api/paas/v4", apiKey: "zk" } },
+      bridge: rtBridge, deps: { llm: mockLlm([]) },
+    });
+    const visCall = seen.find((s) => s.model === "glm-4v-flash");
+    assert(!!visCall, "runtime builds dedicated vision adapter from settings.vision");
+    assert(visCall && visCall.apiKey === "zk", "vision adapter carries its own apiKey (separate from main)");
+    const noVis = runtimeMod.createAgentRuntime({
+      settings: { enableVision: true, vision: { provider: "openai", model: "", baseURL: "https://open.bigmodel.cn/api/paas/v4", apiKey: "" } },
+      bridge: rtBridge, deps: { llm: mockLlm([]) },
+    });
+    const visCallsAfter = seen.filter((s) => s.model === "glm-4v-flash").length;
+    assert(visCallsAfter === 1, "empty vision config does not create a dedicated vision adapter (falls back to main)");
+    assert(!!noVis, "runtime still constructs with empty vision config");
+  } finally {
+    global.createAdapter = origAdapter;
+  }
 
   // ══ Phase 1: Recovery Engine unit tests ══
   const policy = require("../sidepanel/recovery-policy.js");

@@ -217,6 +217,7 @@
     }
     input:focus { border-color: var(--mauve); box-shadow: 0 0 0 2px rgba(203,166,247,.15); }
     .settings-body .full { grid-column: 1 / -1; }
+    .settings-body .vis-head { margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(203,166,247,.25); color: var(--subtext); font-size: 12px; }
     #saveSettings {
       grid-column: 1 / -1;
       background: var(--mauve);
@@ -520,6 +521,10 @@
         <div class="full"><label>API Key</label><input id="apiKey" type="password"></div>
         <div><label>Max Steps</label><input id="maxSteps" type="number" value="30"></div>
         <div><label><input id="enableVision" type="checkbox" style="width:auto; vertical-align:middle"> Vision 兜底</label></div>
+        <div class="full vis-head">视觉模型（独立配置，留空则复用上方模型）</div>
+        <div><label>Vision Model</label><input id="visionModel" placeholder="glm-4v-flash"></div>
+        <div><label>Vision Base URL</label><input id="visionBaseUrl" placeholder="https://open.bigmodel.cn/api/paas/v4"></div>
+        <div class="full"><label>Vision API Key</label><input id="visionApiKey" type="password"></div>
         <button id="saveSettings">保存设置</button>
       </div>
     </details>
