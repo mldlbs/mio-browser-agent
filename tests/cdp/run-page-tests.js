@@ -39,6 +39,17 @@ const { openTab, runInPage, report } = require("./page-runner");
       const edAppend = executeAction({ name: "type", target: ed, args: { text: "abc", clear: false } });
       check(edAppend.ok && document.getElementById("box-editor").textContent === "xabc", "executor appends to contenteditable");
 
+      // Shadow DOM：open shadow root 内元素可快照 + 定位 + 点击
+      const sbtn = snap.elements.find((e) => e.name.includes("幽灵按钮"));
+      check(!!sbtn && sbtn.shadowPath.length >= 1, "snapshot finds button inside open shadow root", sbtn && JSON.stringify(sbtn.shadowPath));
+      const sinput = snap.elements.find((e) => e.placeholder === "shadow输入框");
+      check(!!sinput && sinput.shadowPath.length >= 1, "snapshot finds input inside open shadow root", sinput && JSON.stringify(sinput.shadowPath));
+      const sLoc = locateElement(sbtn);
+      check(!!sLoc && sLoc.id === "shadow-btn", "locator round-trips shadow element via cssPath", sLoc && sLoc.id);
+      window.__shadowClicks = 0;
+      const sClick = executeAction({ name: "click", target: sbtn, args: {} });
+      check(sClick.ok && window.__shadowClicks === 1, "executor clicks button inside shadow root", sClick.ok);
+
       return out;
     `);
     const fails = report(results);

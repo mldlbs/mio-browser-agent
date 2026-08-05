@@ -10,11 +10,39 @@ function resolveFrameDoc(framePath) {
   return doc;
 }
 
+// Descend through open shadow roots. shadowPath is an array of host XPaths
+// collected by snapshot.js; each step lands on the shadow host then its open root.
+function resolveShadowPath(root, shadowPath) {
+  let container = root;
+  (shadowPath || []).forEach((hostXpath) => {
+    if (!container || typeof container.evaluate !== "function") return;
+    const host = findByXPath(hostXpath, container);
+    if (!host || !host.shadowRoot || host.shadowRoot.mode !== "open") return;
+    container = host.shadowRoot;
+  });
+  return container;
+}
+
+function resolveTargetRoot(target) {
+  const base = resolveFrameDoc(target && target.framePath);
+  return resolveShadowPath(base, target && target.shadowPath) || base;
+}
+
 function findByXPath(xpath, doc) {
   doc = doc || document;
+  if (!doc || typeof doc.evaluate !== "function") return null;
   try {
     const result = doc.evaluate(xpath, doc, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
-    return result.singleNodeValue instanceof Element ? result.singleNodeValue : null;
+    const node = result && result.singleNodeValue;
+    return node && node.nodeType === 1 ? node : null;
+  } catch (_) { return null; }
+}
+
+function findByCssPath(cssPath, doc) {
+  doc = doc || document;
+  if (!doc || typeof doc.querySelector !== "function" || !cssPath) return null;
+  try {
+    return doc.querySelector(cssPath);
   } catch (_) { return null; }
 }
 
@@ -54,22 +82,27 @@ function findByRect(target, doc) {
 
 function locateElement(target) {
   if (!target) return null;
-  const doc = resolveFrameDoc(target.framePath);
+  const root = resolveTargetRoot(target);
+  if (!root) return null;
+  if (target.cssPath) {
+    const el = findByCssPath(target.cssPath, root);
+    if (el) return el;
+  }
   if (target.xpath) {
-    const el = findByXPath(target.xpath, doc);
+    const el = findByXPath(target.xpath, root);
     if (el) return el;
   }
   if (target.role && target.name) {
-    const el = findByName(target.role, target.name, doc);
+    const el = findByName(target.role, target.name, root);
     if (el) return el;
   }
   if (target.boundingBox) {
-    const el = findByRect(target, doc);
+    const el = findByRect(target, root);
     if (el) return el;
   }
   return null;
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { locateElement, findByXPath, findByName, findByRect, resolveFrameDoc };
+  module.exports = { locateElement, findByXPath, findByCssPath, findByName, findByRect, resolveFrameDoc, resolveShadowPath, resolveTargetRoot };
 }

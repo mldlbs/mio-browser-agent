@@ -152,6 +152,29 @@ function assertEq(got, want, name) {
   assert(locatorMod.resolveFrameDoc([]) === rootDoc, "resolveFrameDoc empty path stays on root");
   global.document = savedG;
 
+  // ── Shadow DOM: cssPath builds selector, locator resolves shadow roots ──
+  global.CSS = global.CSS || { escape: (s) => s };
+  global.XPathResult = global.XPathResult || { FIRST_ORDERED_NODE_TYPE: 9 };
+  const shLeaf = { nodeType: 1, tagName: "BUTTON", id: "shadow-btn", parentNode: null };
+  assertEq(snapshotMod.buildCssPath(shLeaf), "#shadow-btn", "buildCssPath prefers id");
+  const sh0 = { nodeType: 1, tagName: "DIV", id: "", parentNode: null, children: [] };
+  const sh1 = { nodeType: 1, tagName: "DIV", id: "", parentNode: sh0, children: [] };
+  const sh2 = { nodeType: 1, tagName: "BUTTON", id: "", parentNode: sh1, children: [] };
+  sh0.children = [sh1]; sh1.children = [sh2];
+  assertEq(snapshotMod.buildCssPath(sh2), "div > div > button", "buildCssPath chains tags");
+  const shadowRootMock = { mode: "open", isShadowRoot: true };
+  const shadowHost = { nodeType: 1, shadowRoot: shadowRootMock };
+  const evalDoc = { evaluate: () => ({ singleNodeValue: shadowHost }) };
+  const resolved = locatorMod.resolveShadowPath(evalDoc, ["//*[@id='host']"]);
+  assert(resolved === shadowRootMock, "resolveShadowPath descends into open shadow root");
+  assert(locatorMod.resolveShadowPath(evalDoc, []) === evalDoc, "resolveShadowPath empty path stays on container");
+  const shadowBtn = { tagName: "BUTTON" };
+  const sroot = { querySelector: (sel) => (sel === "#shadow-btn" ? shadowBtn : null) };
+  assert(locatorMod.findByCssPath("#shadow-btn", sroot) === shadowBtn, "findByCssPath works on ShadowRoot-like container");
+  assert(locatorMod.findByCssPath("", sroot) === null, "findByCssPath empty returns null");
+  assert(locatorMod.findByCssPath("#nope", { querySelector: () => null }) === null, "findByCssPath miss returns null");
+  assert(locatorMod.findByXPath("//x", {}) === null, "findByXPath guards non-evaluate containers");
+
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
   const wfSaved = global.document;
   const wfMockDoc = { body: { innerText: "" }, querySelector: () => null, querySelectorAll: () => [] };

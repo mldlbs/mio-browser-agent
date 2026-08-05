@@ -102,6 +102,25 @@ function buildXPath(el) {
   return "/" + parts.join("/");
 }
 
+// Unique-ish CSS selector path for the element, usable via querySelector on both
+// documents and ShadowRoots (which do not expose XPath evaluate()).
+function buildCssPath(el) {
+  const parts = [];
+  let node = el;
+  while (node && node.nodeType === 1) {
+    if (node.id && node.id === CSS.escape(node.id)) { parts.unshift("#" + node.id); break; }
+    let part = node.tagName.toLowerCase();
+    const parent = node.parentNode;
+    if (parent && parent.nodeType === 1) {
+      const siblings = Array.from(parent.children).filter((s) => s.tagName === node.tagName);
+      if (siblings.length > 1) part += ":nth-of-type(" + (siblings.indexOf(node) + 1) + ")";
+    }
+    parts.unshift(part);
+    node = parent;
+  }
+  return parts.join(" > ");
+}
+
 function hasInteractiveDescendant(el) {
   // Only direct children count as interactive containers. Non-standard nested
   // anchors (e.g. a marketplace product card containing a shop link) must NOT
@@ -119,10 +138,10 @@ function elementValue(el) {
   return "";
 }
 
-function scanDocument(doc, framePath, elements) {
-  const candidates = Array.from(doc.querySelectorAll(INTERACTIVE_SELECTOR));
+function scanRoot(root, framePath, shadowPath, elements, visited) {
+  const candidates = Array.from(root.querySelectorAll(INTERACTIVE_SELECTOR));
   candidates.forEach((el) => {
-    if (!isVisible(el, doc)) return;
+    if (!isVisible(el)) return;
     if (hasInteractiveDescendant(el)) return;
     const r = el.getBoundingClientRect();
     const href = el.getAttribute && el.getAttribute("href");
@@ -139,27 +158,43 @@ function scanDocument(doc, framePath, elements) {
       tag: el.tagName.toLowerCase(),
       text: truncate(textOf(el), 200),
       xpath: buildXPath(el),
+      cssPath: buildCssPath(el),
       href: href ? truncate(href, 200) : "",
       framePath: framePath || [],
+      shadowPath: shadowPath || [],
     });
   });
   // Recurse into same-origin iframes (cross-origin access throws).
-  Array.from(doc.querySelectorAll("iframe")).forEach((iframe, fi) => {
+  Array.from(root.querySelectorAll("iframe")).forEach((iframe, fi) => {
     let idoc;
     try {
       idoc = iframe.contentDocument;
     } catch (_) { return; } // cross-origin: skip
-    if (!idoc) return;
-    scanDocument(idoc, (framePath || []).concat(fi), elements);
+    if (!idoc || visited.has(idoc)) return;
+    visited.add(idoc);
+    scanRoot(idoc, (framePath || []).concat(fi), [], elements, visited);
+  });
+  // Recurse into open shadow roots (closed roots are inaccessible by design).
+  let hosts;
+  try {
+    hosts = Array.from(root.querySelectorAll("*")).filter((el) => el.shadowRoot && el.shadowRoot.mode === "open");
+  } catch (_) { return; }
+  hosts.forEach((host) => {
+    const sroot = host.shadowRoot;
+    if (!sroot || visited.has(sroot)) return;
+    visited.add(sroot);
+    scanRoot(sroot, framePath || [], (shadowPath || []).concat(buildXPath(host)), elements, visited);
   });
 }
 
 function captureSnapshot() {
   const elements = [];
-  scanDocument(document, [], elements);
+  const visited = new Set();
+  visited.add(document);
+  scanRoot(document, [], [], elements, visited);
   return { url: location.href, title: document.title, timestamp: Date.now(), elements };
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { captureSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant };
+  module.exports = { captureSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath };
 }

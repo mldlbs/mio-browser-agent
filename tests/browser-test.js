@@ -10,6 +10,15 @@
 
   const snap = captureSnapshot();
   check(snap.elements.length >= 4, "snapshot captures >= 4 interactive elements");
+  const sbtn = snap.elements.find((e) => e.name.includes("幽灵按钮"));
+  check(!!sbtn && sbtn.shadowPath.length >= 1, "snapshot finds button inside open shadow root");
+  const sinput = snap.elements.find((e) => e.placeholder === "shadow输入框");
+  check(!!sinput && sinput.shadowPath.length >= 1, "snapshot finds input inside open shadow root");
+  const sel = locateElement(sbtn);
+  check(!!sel && sel.id === "shadow-btn", "locator round-trips shadow element via cssPath");
+  window.__shadowClicks = 0;
+  const sclick = executeAction({ name: "click", target: sbtn, args: {} });
+  check(sclick.ok && window.__shadowClicks === 1, "executor clicks button inside shadow root");
   const btn = snap.elements.find((e) => e.role === "button" && e.name.includes("登录"));
   check(!!btn, "snapshot finds login button by role+name");
   const inp = snap.elements.find((e) => e.role === "textbox" && e.placeholder);
