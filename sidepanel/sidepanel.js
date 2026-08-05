@@ -71,6 +71,8 @@ async function init() {
   $("historyToggle").addEventListener("click", toggleHistory);
   $("historyClose").addEventListener("click", toggleHistory);
   $("historyClear").addEventListener("click", clearHistory);
+  $("historyExport").addEventListener("click", exportHistory);
+  $("historySearch").addEventListener("input", renderHistory);
 }
 
 function toggleHistory() {
@@ -85,6 +87,19 @@ async function clearHistory() {
   appendLog("ui", "历史记录已清空");
 }
 
+async function exportHistory() {
+  const records = await HistoryModule.getHistory();
+  if (!records.length) { toast("没有可导出的历史记录"); return; }
+  const blob = new Blob([JSON.stringify(records, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mio-history-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+  toast("已导出 " + records.length + " 条记录");
+}
+
 async function historyLog(goal) {
   if (!currentTask) return;
   const evRendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
@@ -97,24 +112,26 @@ async function historyLog(goal) {
 function renderHistory() {
   const list = $("historyList");
   list.innerHTML = "";
+  const q = $("historySearch").value || "";
   HistoryModule.getHistory().then((records) => {
-    if (!records.length) {
+    const filtered = HistoryModule.filterRecords(records, q);
+    if (!filtered.length) {
       const empty = document.createElement("div");
       empty.className = "history-empty";
-      empty.textContent = "暂无历史记录";
+      empty.textContent = q ? "没有匹配的记录" : "暂无历史记录";
       list.appendChild(empty);
       return;
     }
-    for (const r of records) {
+    for (const r of filtered) {
       const item = document.createElement("div");
-      item.className = "history-item s-" + r.status;
+      item.className = "history-item s-" + r.status + (r.pinned ? " pinned" : "");
       const head = document.createElement("div");
       head.className = "history-item-head";
       const info = document.createElement("div");
       info.className = "history-item-info";
       const goalEl = document.createElement("div");
       goalEl.className = "history-goal";
-      goalEl.textContent = r.goal;
+      goalEl.textContent = (r.pinned ? "★ " : "") + r.goal;
       const meta = document.createElement("div");
       meta.className = "history-meta";
       meta.textContent = formatTime(r.startedAt) + " · " +
@@ -122,9 +139,16 @@ function renderHistory() {
         (r.recoveries || r.replans ? " · 恢复 " + r.recoveries + "/重规划 " + r.replans : "");
       info.appendChild(goalEl);
       info.appendChild(meta);
-      const badge = document.createElement("span");
-      badge.className = "history-status";
-      badge.textContent = r.status;
+      const pinBtn = document.createElement("button");
+      pinBtn.className = "history-pin";
+      pinBtn.textContent = r.pinned ? "★" : "☆";
+      pinBtn.title = r.pinned ? "取消收藏" : "收藏";
+      pinBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await HistoryModule.updateHistoryRecord(r.id, { pinned: !r.pinned });
+        renderHistory();
+      });
+      head.appendChild(pinBtn);
       head.appendChild(info);
       if (r.resume) {
         const resumeBtn = document.createElement("button");
@@ -137,6 +161,19 @@ function renderHistory() {
         });
         head.appendChild(resumeBtn);
       }
+      const replayBtn = document.createElement("button");
+      replayBtn.className = "history-replay";
+      replayBtn.textContent = "重跑";
+      replayBtn.title = "重新执行该任务";
+      replayBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleHistory();
+        startTask({ goal: r.goal });
+      });
+      head.appendChild(replayBtn);
+      const badge = document.createElement("span");
+      badge.className = "history-status";
+      badge.textContent = r.status;
       head.appendChild(badge);
       const body = document.createElement("div");
       body.className = "history-item-body";
@@ -145,6 +182,17 @@ function renderHistory() {
         sum.className = "history-summary";
         sum.textContent = r.summary;
         body.appendChild(sum);
+      }
+      if (r.tags && r.tags.length) {
+        const tags = document.createElement("div");
+        tags.className = "history-tags";
+        for (const t of r.tags) {
+          const tagEl = document.createElement("span");
+          tagEl.className = "history-tag";
+          tagEl.textContent = "#" + t;
+          tags.appendChild(tagEl);
+        }
+        body.appendChild(tags);
       }
       const logsWrap = document.createElement("div");
       logsWrap.className = "history-logs";
@@ -159,6 +207,25 @@ function renderHistory() {
           logsWrap.scrollTop = logsWrap.scrollHeight;
         }
       });
+      const tagAdd = document.createElement("span");
+      tagAdd.className = "history-tag-add";
+      tagAdd.textContent = "+ 标签";
+      tagAdd.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const input = (globalThis.prompt && prompt("输入标签，逗号分隔（可清空移除）", (r.tags || []).join(", ")));
+        if (input === null) return;
+        const tags = input.split(/[,，]/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
+        await HistoryModule.updateHistoryRecord(r.id, { tags });
+        renderHistory();
+      });
+      if (!body.querySelector(".history-tags")) {
+        const tags = document.createElement("div");
+        tags.className = "history-tags";
+        tags.appendChild(tagAdd);
+        body.insertBefore(tags, logsWrap);
+      } else {
+        body.querySelector(".history-tags").appendChild(tagAdd);
+      }
       list.appendChild(item);
     }
   });

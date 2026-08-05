@@ -356,6 +356,58 @@
       color: var(--green);
       border-color: rgba(166,227,161,.4);
     }
+    .history-search {
+      border: none;
+      border-bottom: 1px solid var(--surface);
+      border-radius: 0;
+      padding: 8px 12px;
+      background: var(--base);
+    }
+    .history-search::placeholder { color: var(--overlay); }
+    .history-actions button { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
+    #historyExport { background: transparent; color: var(--teal); border-color: rgba(148,226,213,.35); }
+    .history-pin {
+      flex: none;
+      padding: 3px 9px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--overlay);
+      border-color: var(--surface);
+    }
+    .history-item.pinned .history-pin { color: var(--yellow, #f9e2af); border-color: rgba(249,226,175,.4); }
+    .history-replay {
+      flex: none;
+      padding: 3px 9px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--mauve);
+      border-color: rgba(203,166,247,.4);
+    }
+    .history-tags {
+      padding: 0 11px 6px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .history-tag {
+      font-size: 10px;
+      color: var(--lavender);
+      background: rgba(180,190,254,.08);
+      border: 1px solid rgba(180,190,254,.25);
+      border-radius: 999px;
+      padding: 1px 8px;
+    }
+    .history-tag-add {
+      font-size: 10px;
+      color: var(--overlay);
+      background: transparent;
+      border: 1px dashed var(--surface);
+      border-radius: 999px;
+      padding: 1px 8px;
+      cursor: pointer;
+    }
     .history-item.s-done .history-status { color: var(--green); border-color: rgba(166,227,161,.35); }
     .history-item.s-error .history-status { color: var(--red); border-color: rgba(243,139,168,.35); }
     .history-item-body { display: none; }
@@ -434,10 +486,12 @@
       <div class="history-head">
         <span>任务历史</span>
         <div class="history-actions">
+          <button id="historyExport" title="导出 JSON">导出</button>
           <button id="historyClear">清空</button>
           <button id="historyClose">关闭</button>
         </div>
       </div>
+      <input id="historySearch" class="history-search" type="text" placeholder="搜索目标 / 摘要 / 标签…">
       <div class="history-list" id="historyList"></div>
     </div>
 

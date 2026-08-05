@@ -224,6 +224,24 @@ function assertEq(got, want, name) {
   assertEq(capped.length, historyMod.MAX_RECORDS, "history capped at MAX_RECORDS");
   await historyMod.clearHistory();
   assertEq((await historyMod.getHistory()).length, 0, "clearHistory empties storage");
+  // P2: pinned / tags / update / filter / sort
+  const p1 = historyMod.normalizeRecord({ id: "p1", goal: "比价", status: "done", pinned: true, tags: ["购物", "对比"] });
+  assert(p1.pinned, "normalizeRecord keeps pinned");
+  assertEq(p1.tags.length, 2, "normalizeRecord keeps tags");
+  assertEq(historyMod.normalizeRecord({ id: "p2" }).pinned, false, "normalizeRecord defaults pinned false");
+  await historyMod.addHistoryRecord({ id: "p1", goal: "比价", status: "done", startedAt: 10, pinned: true, tags: ["购物"] });
+  await historyMod.addHistoryRecord({ id: "p2", goal: "发邮件", status: "error", startedAt: 20 });
+  const upd = await historyMod.updateHistoryRecord("p2", { tags: ["工作"], pinned: true });
+  assert(upd.find((r) => r.id === "p2").pinned, "updateHistoryRecord sets pinned");
+  assertEq(upd.find((r) => r.id === "p2").tags[0], "工作", "updateHistoryRecord sets tags");
+  const filtered = historyMod.filterRecords(await historyMod.getHistory(), "购物");
+  assertEq(filtered.length, 1, "filterRecords matches tag");
+  const byGoal = historyMod.filterRecords(await historyMod.getHistory(), "比价");
+  assertEq(byGoal.length, 1, "filterRecords matches goal");
+  const all = historyMod.filterRecords(await historyMod.getHistory(), "");
+  assertEq(all.length, 2, "filterRecords empty query returns all");
+  assert(all[0].pinned, "sortRecords puts pinned first");
+  await historyMod.clearHistory();
   delete global.chrome;
 
   // ── adapter normalize ──
