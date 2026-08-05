@@ -40,6 +40,24 @@ function associatedLabel(el) {
   return "";
 }
 
+// Best-effort semantic name for icon-only buttons (no text, no aria-label):
+// falls back to SVG <title>, then icon-ish class names, then a generic label.
+function iconButtonName(el) {
+  const svg = el.querySelector && el.querySelector("svg");
+  if (svg) {
+    const t = svg.querySelector("title");
+    if (t && t.textContent.trim()) return truncate(t.textContent.trim(), 100);
+    const svgAria = svg.getAttribute("aria-label");
+    if (svgAria) return truncate(svgAria, 100);
+  }
+  const cls = (el.getAttribute && el.getAttribute("class")) || "";
+  if (cls) {
+    const hint = (String(cls).toLowerCase().match(/[\w-]*(?:send|submit|sendbtn|send-btn|发送|确定|confirm|go)[\w-]*/) || [])[0];
+    if (hint) return truncate("图标(" + hint.replace(/[_-]+/g, " ") + ")", 100);
+  }
+  return "图标按钮";
+}
+
 function computeAccessibleName(el) {
   const byId = labelledBy(el);
   if (byId) return truncate(byId, 100);
@@ -59,7 +77,23 @@ function computeAccessibleName(el) {
   if (alt) return truncate(alt, 100);
   const title = el.getAttribute("title");
   if (title) return truncate(title, 100);
+  // Icon-only buttons and clickable boxes need a usable name; a bare "div" is
+  // impossible for the agent to tell apart from other divs (→ misclicks/double-sends).
+  if (tag === "button" || tag === "summary" || isClickableBox(el)) {
+    return iconButtonName(el);
+  }
   return tag;
+}
+
+// True for elements that behave like a button even without <button>/role="button":
+// click handlers or keyboard-usable semantics (tabindex≥0) on a generic box.
+function isClickableBox(el) {
+  const tag = el.tagName.toLowerCase();
+  if (tag !== "div" && tag !== "span") return false;
+  if (el.getAttribute("onclick") || el.getAttribute("onmousedown") || el.getAttribute("onpointerdown")) return true;
+  const tab = el.getAttribute("tabindex");
+  if (tab != null && parseInt(tab, 10) >= 0) return true;
+  return false;
 }
 
 function computeRole(el) {
@@ -69,6 +103,7 @@ function computeRole(el) {
   const tag = el.tagName.toLowerCase();
   if (tag === "a") return "link";
   if (tag === "button" || tag === "summary") return "button";
+  if (isClickableBox(el)) return "button";
   if (tag === "textarea") return "textbox";
   if (tag === "input") {
     const t = (el.type || "text").toLowerCase();

@@ -104,6 +104,34 @@ function assertEq(got, want, name) {
   const container = mockEl("div", [btn]);
   assert(snapshotMod.hasInteractiveDescendant(container), "direct interactive child still disqualifies container");
 
+  // ── icon-only buttons get a usable name (not a bare "div") ──
+  const iconBtnEl = {
+    tagName: "DIV",
+    getAttribute: (a) => (a === "onclick" ? "return 0" : a === "class" ? "ds-icon-btn send" : null),
+    querySelector: (s) => (s === "svg" ? null : null),
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.computeRole(iconBtnEl), "button", "clickable div maps to button role");
+  assert(snapshotMod.computeAccessibleName(iconBtnEl).includes("send"), "icon button named from class");
+  const plainDiv = {
+    tagName: "DIV",
+    getAttribute: () => null,
+    querySelector: () => null,
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.computeRole(plainDiv), "generic", "plain div stays generic");
+  assertEq(snapshotMod.computeAccessibleName(plainDiv), "div", "plain div name unchanged");
+  const svgIconBtn = {
+    tagName: "BUTTON",
+    getAttribute: (a) => (a === "onclick" ? null : null),
+    querySelector: (s) => (s === "svg" ? { querySelector: (t) => (t === "title" ? { textContent: "发送" } : null), getAttribute: () => null } : null),
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.computeAccessibleName(svgIconBtn), "发送", "icon button named from svg title");
+
   // ── extractPageText: pulls readable text, strips noise, caps length ──
   const savedDoc = global.document;
   const savedLoc = global.location;

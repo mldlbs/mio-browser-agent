@@ -44,6 +44,7 @@ Use tools to manipulate the page. Rules:
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
 - After clicking a submit/send button, WAIT for the page to respond (new message, loading indicator, navigation) before doing anything else. Do NOT click the same button twice — a repeated click on a send button re-submits the same input and can double-send. If a click result is uncertain, verify via the snapshot instead of clicking again.
+- Icon-only buttons (e.g. named "图标按钮" or with a short icon name) have no visible label. When you need to submit/send, pick the icon button whose bounding box (x,y w×h) is right beside or below the textbox you just typed into — the send control sits next to the input. Do not click random icon buttons elsewhere on the page.
 - You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
 - After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).`;
 
