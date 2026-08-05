@@ -126,6 +126,17 @@ function renderHistory() {
       badge.className = "history-status";
       badge.textContent = r.status;
       head.appendChild(info);
+      if (r.resume) {
+        const resumeBtn = document.createElement("button");
+        resumeBtn.className = "history-resume";
+        resumeBtn.textContent = "继续";
+        resumeBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          toggleHistory();
+          startTask(r.resume);
+        });
+        head.appendChild(resumeBtn);
+      }
       head.appendChild(badge);
       const body = document.createElement("div");
       body.className = "history-item-body";
@@ -153,10 +164,11 @@ function renderHistory() {
   });
 }
 
-async function startTask() {
+async function startTask(resume) {
   if ($("start").disabled) return;
-  const goal = $("goal").value.trim();
+  const goal = resume && resume.goal ? resume.goal : $("goal").value.trim();
   if (!goal) { toast("请输入任务目标"); return; }
+  if (resume) $("goal").value = goal;
   const settings = {
     provider: $("provider").value.trim() || "openai",
     model: $("model").value.trim() || "gpt-4o-mini",
@@ -183,6 +195,7 @@ async function startTask() {
     replans: 0,
     logs: [],
     recoveryEvents: RecoveryEventsModule.startEvents(),
+    resume: resume || null,
   };
 
   runtime = createAgentRuntime({
@@ -208,19 +221,21 @@ async function startTask() {
       $("log").appendChild(msg);
       $("log").scrollTop = $("log").scrollHeight;
     },
+    onCheckpoint: (cp) => { if (currentTask) currentTask.resume = cp; },
     onState: (state) => setStatus(state),
     deps: { maxSteps: settings.maxSteps || 30 },
   });
 
   try {
-    await runtime.run(goal);
+    const result = await runtime.run(goal, resume);
     const m = (globalThis.MetricsModule && globalThis.MetricsModule.getMetrics) ? globalThis.MetricsModule.getMetrics() : {};
-    currentTask.status = "done";
+    currentTask.status = result.ok ? "done" : "error";
     currentTask.recoveries = m.recoveryCount || 0;
     currentTask.replans = m.replanCount || 0;
     currentTask.finishedAt = Date.now();
+    if (!result.ok && result.resume) currentTask.resume = result.resume;
     await historyLog(goal);
-    setStatus("done", "done");
+    setStatus(currentTask.status, currentTask.status);
   } catch (e) {
     currentTask.status = "error";
     currentTask.summary = e.message || String(e);

@@ -24,7 +24,16 @@ function snapshotStats(snapshot) {
 
 function snapshotToLines(snapshot) {
   if (!snapshot) return "Page: (no snapshot)\n";
-  const lines = [`Page: ${snapshot.url} | Title: ${snapshot.title}`];
+  const loc = [];
+  if (snapshot.tabIndex != null && snapshot.tabCount != null && snapshot.tabCount > 1) {
+    loc.push(`Tab ${snapshot.tabIndex + 1}/${snapshot.tabCount}`);
+  }
+  loc.push(`Page: ${snapshot.url} | Title: ${snapshot.title}`);
+  const lines = [loc.join(" · ")];
+  if (snapshot.tabs && snapshot.tabs.length > 1) {
+    const tabDesc = snapshot.tabs.map((t) => `[${t.index}] ${t.title || t.url}${t.active ? "*" : ""}`).join("  ");
+    lines.push(`Tabs: ${tabDesc}`);
+  }
   snapshot.elements.forEach((e) => {
     const state = [];
     if (e.value) state.push(`value="${e.value}"`);
@@ -32,7 +41,8 @@ function snapshotToLines(snapshot) {
     if (e.disabled) state.push("disabled");
     const box = e.boundingBox ? ` (${e.boundingBox.x},${e.boundingBox.y} ${e.boundingBox.w}x${e.boundingBox.h})` : "";
     const dest = e.href ? ` → ${e.href}` : "";
-    lines.push(`[${e.index}] ${e.role} "${e.name}"${dest}${state.length ? " " + state.join(" ") : ""}${box}`);
+    const frame = e.frameId ? ` [frame ${e.frameId}]` : "";
+    lines.push(`[${e.index}] ${e.role} "${e.name}"${dest}${frame}${state.length ? " " + state.join(" ") : ""}${box}`);
   });
   return lines.join("\n");
 }

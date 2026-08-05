@@ -38,7 +38,9 @@ Use tools to manipulate the page. Rules:
 - Never claim success you cannot verify.
 - Links show their destination after '→'. On shopping/search pages prefer product-card links (e.g. href containing /item/, /dp/, /product/) over shop or category links (e.g. /store/, /shop/, /seller/). Avoid clicking a shop link when you want a product.
 - To find another product later, first finish the current step; the system advances you to the next step.
-- If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.`;
+- If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
+- You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
+- After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).`;
 
 function buildSystemPrompt(goal, plan, step) {
   return AGENT_PROMPT
@@ -311,7 +313,7 @@ async function execute(plan, ctx) {
   
   const history = [{ role: "system", content: "" }];
   const runCtx = Object.assign({}, ctx, { history, plan, goal: plan.goal });
-  let current = 0;
+  let current = ctx.startStep || 0;
   let attemptsForStep = 0;
   let replans = 0;
   let lastSummary = "";
@@ -319,13 +321,16 @@ async function execute(plan, ctx) {
   
   runCtx.recoveryHistory = [];
   runCtx.recoveryAttempts = 0;
+
+  const buildResume = () => ({ goal: plan.goal, plan, nextStepIndex: current, lastSummary });
+  const emitCheckpoint = () => { if (ctx.onCheckpoint) ctx.onCheckpoint(buildResume()); };
   
   while (current < plan.steps.length) {
-    if (ctx.isStopped && ctx.isStopped()) return { ok: false, error: "stopped by user" };
+    if (ctx.isStopped && ctx.isStopped()) return { ok: false, error: "stopped by user", resume: buildResume() };
     totalSteps++;
     if (totalSteps > (ctx.maxSteps || 30)) {
       ctx.onLog("warn", `总步数超限 (${ctx.maxSteps || 30})，停止`);
-      return { ok: false, error: `exceeded ${ctx.maxSteps || 30} total steps` };
+      return { ok: false, error: `exceeded ${ctx.maxSteps || 30} total steps`, resume: buildResume() };
     }
     
     const step = plan.steps[current];
@@ -342,6 +347,7 @@ async function execute(plan, ctx) {
       runCtx.recoveryHistory = [];
       if (result.summary) lastSummary = result.summary;
       ctx.onLog("step", "DONE: " + (result.summary || "完成"));
+      emitCheckpoint();
       continue;
     }
     
@@ -351,7 +357,7 @@ async function execute(plan, ctx) {
       _recordReplan();
       if (replans >= (ctx.maxReplans || 3)) {
         ctx.onLog("warn", `重规划次数超限 (${replans})，停止`);
-        return { ok: false, error: `exceeded ${replans} replans` };
+        return { ok: false, error: `exceeded ${replans} replans`, resume: buildResume() };
       }
       ctx.onLog("warn", `步骤连续失败，重新规划: ${step.description}`);
       const newPlan = await ctx.replan(plan.goal, step);

@@ -58,7 +58,7 @@ DOM 已更新
 
 ## P1 · 随后做
 
-### 多页上下文
+### 多页上下文 ✅
 
 浏览器 Agent 与 Workflow Agent 的分水岭。例如：
 
@@ -75,9 +75,13 @@ BrowserContext
     memory
 ```
 
-### 停止 / 续跑
+**已实现**：`tab` 工具（open/list/switch/close）；snapshot 携带 tabs 全景（`tabIndex`/`tabCount`/`Tabs:` 列表行）；跨 tab diff 抑制（导航不误报 DOM 变更）；Prompt 跨页指导。
+
+### 停止 / 续跑 ✅
 
 停止时不只告知「完成 8/12 步」，还应保存 `resumeToken`；恢复时提供「继续上次任务」，Agent 可直接从断点继续。
+
+**已实现**：executor 每步成功后发 `onCheckpoint`；停止时返回 `resume` 断点（goal/plan/nextStepIndex）；历史记录保存断点并提供「继续」按钮，从断点步续跑。
 
 ---
 

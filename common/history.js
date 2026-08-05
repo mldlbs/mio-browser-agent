@@ -12,6 +12,7 @@ function normalizeRecord(r) {
     recoveries: r && r.recoveries || 0,
     replans: r && r.replans || 0,
     logs: Array.isArray(r && r.logs) ? r.logs : [],
+    resume: r && r.resume || null,
   };
 }
 

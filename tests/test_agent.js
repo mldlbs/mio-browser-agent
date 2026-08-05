@@ -760,6 +760,104 @@ function assertEq(got, want, name) {
   delete global.make;
   delete global.chrome;
 
+  // ── multi-tab: snapshot carries a BrowserContext overview (tabs + active index) ──
+  const multiTabChrome = {
+    tabs: {
+      query: async () => [
+        { id: 1, index: 0, title: "首页", url: "https://a.example", active: false, windowId: 7 },
+        { id: 2, index: 1, title: "京东", url: "https://jd.example", active: true, windowId: 7 },
+      ],
+      sendMessage: async () => ({ type: protocol.MSG.SNAPSHOT_RESPONSE, payload: { snapshot: { title: "京东", url: "https://jd.example", elements: [{ role: "button", name: "加购", index: 0, framePath: [] }] } } }),
+    },
+    scripting: { executeScript: async () => {} },
+    webNavigation: { getAllFrames: async () => [{ frameId: 0, url: "https://jd.example" }] },
+  };
+  const mtCtx = { chrome: multiTabChrome, MSG: protocol.MSG, make: protocol.make };
+  vm.createContext(mtCtx);
+  vm.runInContext(fs.readFileSync(require.resolve("../sidepanel/bridge.js"), "utf8"), mtCtx);
+  const mtSnap = await mtCtx.createPageBridge().snapshot();
+  assertEq(mtSnap.tabCount, 2, "multi-tab snapshot reports tab count");
+  assertEq(mtSnap.tabIndex, 1, "multi-tab snapshot reports active tab index");
+  assertEq(mtSnap.tabs[0].title, "首页", "snapshot lists sibling tabs");
+  delete global.MSG;
+  delete global.make;
+  delete global.chrome;
+
+  // ── snapshotToLines renders BrowserContext header when >1 tab ──
+  const tabSnap = { url: "u", title: "t", tabIndex: 1, tabCount: 2, tabs: [{ index: 0, title: "首页", url: "a", active: false }, { index: 1, title: "京东", url: "b", active: true }], elements: [] };
+  const tabLines = protocol.snapshotToLines(tabSnap);
+  assert(tabLines.includes("Tab 2/2"), "snapshotToLines prefixes active tab position");
+  assert(tabLines.includes("Tabs: [0] 首页"), "snapshotToLines lists tabs");
+  const singleTabLines = protocol.snapshotToLines({ url: "u", title: "t", tabCount: 1, tabIndex: 0, elements: [] });
+  assert(!singleTabLines.includes("Tab 1/1"), "snapshotToLines omits tab prefix for single tab");
+
+  // ── memory: navigation / tab switch does not report a noisy diff ──
+  const tabMem = memoryMod.createMemory();
+  tabMem.remember({ url: "https://a.example", title: "A", elements: [{ role: "button", name: "X" }] });
+  const switched = tabMem.remember({ url: "https://b.example", title: "B", elements: [{ role: "textbox", name: "Y" }] });
+  assertEq(switched.added.length, 0, "tab switch suppresses added diff");
+  assertEq(switched.removed.length, 0, "tab switch suppresses removed diff");
+  const samePage = tabMem.remember({ url: "https://b.example", title: "B", elements: [{ role: "textbox", name: "Z" }] });
+  assert(samePage.added.includes("textbox:Z"), "same-page diff still reported after switch");
+
+  // ── resume: onCheckpoint emits progress, execute honors startStep ──
+  const resumeBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }),
+    executeAction: async (action) => ({ ok: true, value: `did ${action.name}` }),
+  };
+  const checkpoints = [];
+  const resumeLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步a完成" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步b完成" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步b完成" })] }),
+  ]);
+  const resumeRun = await executorMod.execute(
+    { goal: "g", steps: [{ description: "a" }, { description: "b" }] },
+    {
+      llm: resumeLlm, bridge: resumeBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      onCheckpoint: (cp) => checkpoints.push(cp),
+      maxTurns: 3, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(resumeRun.ok, "resume source run completes");
+  assert(checkpoints.length >= 2, "onCheckpoint emitted after each step");
+  assertEq(checkpoints[checkpoints.length - 1].nextStepIndex, 2, "final checkpoint points past the last step");
+  const resumed = await executorMod.execute(
+    checkpoints[0].plan, // plan object from the first checkpoint
+    {
+      llm: resumeLlm, bridge: resumeBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      startStep: 1, // resume from step index 1
+      maxTurns: 3, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(resumed.ok && resumed.summary === "步b完成", "resume run starts at startStep and finishes the remaining step");
+
+  // ── resume: stop returns a resume token ──
+  let stopNow = false;
+  const stopBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }),
+    executeAction: async () => ({ ok: true, value: "ok" }),
+  };
+  const stopLlm = mockLlm([
+    () => { stopNow = true; return { content: "", toolCalls: [makeToolCall("finish", { summary: "步a" })] }; },
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步b" })] }),
+  ]);
+  const stopRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "a" }, { description: "b" }, { description: "c" }] },
+    {
+      llm: stopLlm, bridge: stopBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      startStep: 0, maxTurns: 3, maxStepRetries: 3, isStopped: () => stopNow,
+    }
+  );
+  assert(!stopRes.ok && stopRes.resume, "stop returns a resume token");
+  assertEq(stopRes.resume.nextStepIndex, 1, "resume token points to the next unrun step");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();

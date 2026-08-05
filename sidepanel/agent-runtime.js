@@ -3,16 +3,22 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
   const memory = createMemory();
   let stopRequested = false;
 
-  async function run(goal) {
+  async function run(goal, resume) {
     onState("planning");
-    onLog("plan", "开始规划…");
+    onLog("plan", resume && resume.plan ? "继续上次任务…" : "开始规划…");
     try {
-      const planDoc = await planner.plan(goal, llm);
+      let planDoc;
+      if (resume && resume.plan) {
+        planDoc = resume.plan;
+      } else {
+        planDoc = await planner.plan(goal, llm);
+      }
       onLog("plan", planDoc.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
       onState("running");
       const result = await executor.execute(planDoc, {
         llm, bridge, memory, onLog, onRecovery,
         getTool, getToolsSchema,
+        startStep: (resume && resume.nextStepIndex) || 0,
         replan: (goal2, step) => planner.replan(goal2, step, llm),
         maxTurns: deps.maxTurns || 8,
         maxStepRetries: deps.maxStepRetries || 3,

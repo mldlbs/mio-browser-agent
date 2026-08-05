@@ -7,6 +7,10 @@ function createMemory() {
     const prev = lastSnapshot;
     lastSnapshot = snapshot;
     if (!prev) return { added: names(snapshot), removed: [] };
+    // Navigation or tab switch: the whole document changed; don't report a noisy diff.
+    if (prev.url && snapshot.url && prev.url !== snapshot.url) {
+      return { added: [], removed: [] };
+    }
     const a = new Set(names(snapshot));
     const b = new Set(names(prev));
     return {

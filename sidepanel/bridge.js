@@ -54,10 +54,16 @@ function createPageBridge() {
       const mainTab = await getActiveTab();
       const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true });
       if (!res || res.type !== MSG.SNAPSHOT_RESPONSE) throw new Error("bad snapshot response");
+      const tabs = await chrome.tabs.query({ windowId: mainTab.windowId });
+      const tabIndex = tabs.findIndex((t) => t.active && t.windowId === mainTab.windowId);
       const merged = {
         url: (main && main.url) || mainTab.url || "",
         title: res.payload.snapshot.title,
         timestamp: Date.now(),
+        tabs: tabs.map((t) => ({ index: t.index, title: t.title || "", url: t.url || "", active: !!t.active })),
+        tabIndex: tabIndex >= 0 ? tabIndex : mainTab.index,
+        tabCount: tabs.length,
+        tabActiveTitle: mainTab.title || "",
         elements: [],
       };
       // frameOnly snapshot already covers the main document; reindex with frameId 0.
