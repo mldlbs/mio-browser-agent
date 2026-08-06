@@ -44,42 +44,57 @@
 
 ```mermaid
 graph TB
-  subgraph UI["sidepanel · 侧边面板与运行时"]
-    SUI["sidepanel.html/js — 界面 / 历史 / 收起"]
-    PLAN["planner.js — 任务规划"]
-    EXEC["executor.js — 步骤循环"]
-    RT["agent-runtime.js — 总调度"]
-    REC["recovery-*.js — 恢复引擎"]
-    MEM["memory.js — 访问记忆"]
-    VISION["vision.js — 视觉模型"]
-    BRIDGE["bridge.js — 页面桥"]
-    TURN["turn-handler.js — LLM 轮次"]
-  end
-  subgraph CONTENT["content · 注入页面"]
-    SNAP["snapshot.js — 页面快照"]
-    LOC["locator.js — 元素定位"]
-    CEXEC["executor.js — 页面动作"]
-    CM["main.js — 消息分发"]
-  end
-  subgraph TOOLS["tools · 工具集"]
-    T_BASIC["click / type / scroll / navigate / wait"]
-    T_EXT["extract_text / paste / tab"]
-    T_CAPTCHA["read_captcha.js — 验证码位图"]
-  end
-  LLM["llm · OpenAI 兼容适配层"]
-  COMMON["common · 协议 / 存储 / 日志"]
+  User(["🎯 用户目标"]):::user --> UI
 
-  SUI --> PLAN --> RT --> EXEC
+  subgraph SP["sidepanel · Agent 运行时"]
+    UI["sidepanel.html/js"]:::sp
+    PLAN["planner.js"]:::sp
+    RT["agent-runtime.js"]:::sp
+    EXEC["executor.js"]:::sp
+    TURN["turn-handler.js"]:::sp
+    REC["recovery-*.js"]:::sp
+    MEM["memory.js"]:::sp
+    VISION["vision.js"]:::sp
+    BRIDGE["bridge.js"]:::sp
+  end
+
+  subgraph CS["content · 注入页面"]
+    MAIN["main.js"]:::cs
+    SNAP["snapshot.js"]:::cs
+    LOC["locator.js"]:::cs
+    CEXEC["executor.js"]:::cs
+  end
+
+  subgraph TO["tools · 工具集"]
+    T1["click · type · scroll · navigate · wait"]:::to
+    T2["extract_text · paste · tab"]:::to
+    T3["read_captcha（验证码位图）"]:::to
+  end
+
+  subgraph CO["llm · common"]
+    LLM["LLM 适配层"]:::co
+    PROTO["协议 · 存储 · 日志"]:::co
+  end
+
+  UI --> PLAN --> RT --> EXEC
   EXEC --> TURN --> LLM
   EXEC --> REC
-  EXEC --> TOOLS
-  EXEC --> BRIDGE --> CM
-  CM --> CEXEC
-  CEXEC --> SNAP --> CM
-  CM --> LOC --> CEXEC
-  BRIDGE <--> COMMON <--> CM
+  EXEC --> TO
+  EXEC --> BRIDGE
+  BRIDGE <--> PROTO <--> MAIN
+  MAIN --> CEXEC
+  CEXEC --> SNAP
+  SNAP --> MAIN
+  MAIN --> LOC --> CEXEC
   VISION --> LLM
   MEM --> EXEC
+  LLM --> EXEC
+
+  classDef user fill:#f5c2e7,stroke:#f5c2e7,color:#11111b,font-weight:bold
+  classDef sp fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
+  classDef cs fill:#181825,stroke:#b4befe,color:#cdd6f4
+  classDef to fill:#181825,stroke:#94e2d5,color:#cdd6f4
+  classDef co fill:#181825,stroke:#f9e2af,color:#cdd6f4
 ```
 
 数据流：`planner.js` 规划 → `agent-runtime.js` 调度 `executor.js` 逐步骤执行 → `bridge.js` 通知 `content/main.js` 在页面内动作 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
