@@ -87,6 +87,10 @@ function toast(msg) {
 }
 
 async function init() {
+  const verEl = $("version");
+  if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
+    verEl.textContent = "v" + (chrome.runtime.getManifest().version || "");
+  }
   const s = await getSettings();
   $("provider").value = s.provider;
   $("model").value = s.model;
