@@ -50,6 +50,15 @@ const { openTab, runInPage, report } = require("./page-runner");
       const sClick = executeAction({ name: "click", target: sbtn, args: {} });
       check(sClick.ok && window.__shadowClicks === 1, "executor clicks button inside shadow root", sClick.ok);
 
+      // Canvas captcha：快照收录 + 可定位 + 可点击（登录验证码场景）
+      const cap = snap.elements.find((e) => e.tag === "canvas");
+      check(!!cap, "snapshot captures canvas captcha element", cap && JSON.stringify(cap));
+      const capEl = locateElement(cap);
+      check(!!capEl && capEl.id === "captcha-canvas", "locator round-trips canvas element", capEl && capEl.id);
+      window.__captchaClicks = 0;
+      const capClick = executeAction({ name: "click", target: cap, args: {} });
+      check(capClick.ok && window.__captchaClicks === 1, "executor clicks canvas captcha", capClick.ok);
+
       return out;
     `);
     const fails = report(results);

@@ -186,7 +186,7 @@ async function executeStep(step, ctx) {
       
       let result;
       try {
-        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory });
+        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory, llm: ctx.visionLlm || ctx.llm });
       } catch (e) {
         // Tool exceptions are immediate failures (not recoverable)
         result = { ok: false, error: (e && e.message) || String(e), errorCode: "TOOL_EXCEPTION" };

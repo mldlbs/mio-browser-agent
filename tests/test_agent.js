@@ -17,6 +17,7 @@ require("../tools/wait.js");
 require("../tools/navigate.js");
 require("../tools/extract_text.js");
 require("../tools/paste.js");
+require("../tools/read_captcha.js");
 require("../tools/tab.js");
 const plannerMod = require("../sidepanel/planner.js");
 const memoryMod = require("../sidepanel/memory.js");
@@ -1319,6 +1320,24 @@ function assertEq(got, want, name) {
   assert(visionMod2.parseSendConfirm("已发送，消息发出去了").sent, "parseSendConfirm detects sent");
   assert(!visionMod2.parseSendConfirm("未发送，输入框仍有文字").sent, "parseSendConfirm detects not-sent");
   assert(visionMod2.buildSendConfirmPrompt().includes("已发送"), "send-confirm prompt asks for sent/not-sent");
+
+  // ── read_captcha tool ──
+  const captchaTool = registryMod.getTool("read_captcha");
+  assert(!!captchaTool, "read_captcha tool registered");
+  const captchaOk = await captchaTool.execute({}, {
+    bridge: { capture: async () => "data:image/png;base64,AAA" },
+    llm: { generate: async (msgs, opts) => { assert(!!opts && opts.images && opts.images[0] === "data:image/png;base64,AAA", "read_captcha passes screenshot to llm"); return { content: "3K9f" }; } },
+  });
+  assert(captchaOk.ok && captchaOk.value === "3K9f", "read_captcha returns captcha chars");
+  const captchaFail = await captchaTool.execute({}, {
+    bridge: { capture: async () => "data:image/png;base64,AAA" },
+    llm: { generate: async () => ({ content: "UNREADABLE" }) },
+  });
+  assert(!captchaFail.ok, "read_captcha reports unreadable");
+  const captchaNoCap = await captchaTool.execute({}, { bridge: { capture: async () => "data:image/png;base64,AAA" } });
+  assert(!captchaNoCap.ok && /llm/.test(captchaNoCap.error), "read_captcha fails without llm");
+  const captchaNoShot = await captchaTool.execute({}, { llm: { generate: async () => ({ content: "1234" }) }, bridge: { capture: async () => null } });
+  assert(!captchaNoShot.ok && /capture/.test(captchaNoShot.error), "read_captcha fails without capture");
 
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");

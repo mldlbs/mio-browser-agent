@@ -16,6 +16,9 @@
   <hr>
   <div id="shadow-host"></div>
   <div id="results"></div>
+  <label for="input-captcha">验证码</label>
+  <input id="input-captcha" type="text" placeholder="请输入验证码">
+  <canvas id="captcha-canvas" width="120" height="50" style="border:1px solid #666; cursor:pointer; display:block;" onclick="window.__captchaClicks=(window.__captchaClicks||0)+1"></canvas>
 
   <script>
     (function () {

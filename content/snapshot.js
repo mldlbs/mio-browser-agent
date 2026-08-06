@@ -1,7 +1,7 @@
 // Accessibility snapshot extractor. Pure DOM; no chrome APIs.
 const INTERACTIVE_SELECTOR = [
   "a[href]", "button", "summary", "input", "textarea", "select",
-  "[role]", "[tabindex]", "[contenteditable]", "[onclick]",
+  "[role]", "[tabindex]", "[contenteditable]", "[onclick]", "canvas",
 ].join(",");
 
 function truncate(str, max) {
@@ -64,6 +64,12 @@ function computeAccessibleName(el) {
   const aria = el.getAttribute("aria-label");
   if (aria) return truncate(aria, 100);
   const tag = el.tagName.toLowerCase();
+  // Canvas captchas (login verification codes) have no text/role; surface the
+  // class as a hint so the agent can tell them apart from plain canvases.
+  if (tag === "canvas") {
+    const cls = el.getAttribute("class") || "";
+    return truncate(cls ? "画布(" + cls + ")" : "画布", 100);
+  }
   if (tag === "input" || tag === "textarea" || tag === "select") {
     const lbl = associatedLabel(el);
     if (lbl) return truncate(lbl, 100);
