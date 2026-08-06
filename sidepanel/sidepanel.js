@@ -201,6 +201,8 @@ function renderHistory() {
       });
       head.appendChild(pinBtn);
       head.appendChild(info);
+      const actions = document.createElement("div");
+      actions.className = "history-item-actions";
       if (r.resume) {
         const resumeBtn = document.createElement("button");
         resumeBtn.className = "history-resume";
@@ -210,7 +212,7 @@ function renderHistory() {
           toggleHistory();
           startTask(r.resume);
         });
-        head.appendChild(resumeBtn);
+        actions.appendChild(resumeBtn);
       }
       const replayBtn = document.createElement("button");
       replayBtn.className = "history-replay";
@@ -221,11 +223,12 @@ function renderHistory() {
         toggleHistory();
         startTask({ goal: r.goal });
       });
-      head.appendChild(replayBtn);
+      actions.appendChild(replayBtn);
       const badge = document.createElement("span");
       badge.className = "history-status";
       badge.textContent = r.status;
-      head.appendChild(badge);
+      actions.appendChild(badge);
+      head.appendChild(actions);
       const body = document.createElement("div");
       body.className = "history-item-body";
       if (r.summary) {
