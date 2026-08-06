@@ -234,12 +234,30 @@
       padding: 8px 10px;
     }
     .plan-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
       font-size: 11px;
       font-weight: 700;
       color: var(--mauve);
       letter-spacing: .05em;
       margin-bottom: 6px;
     }
+    .plan-toggle {
+      flex: none;
+      background: transparent;
+      border: 1px solid var(--surface);
+      border-radius: 6px;
+      color: var(--subtext);
+      padding: 1px 8px;
+      font-size: 10px;
+      cursor: pointer;
+      line-height: 1.5;
+    }
+    .plan-toggle:hover { color: var(--text); border-color: var(--overlay); }
+    .plan-panel.collapsed { padding: 8px 10px; }
+    .plan-panel.collapsed .plan-steps { display: none; }
     .plan-steps { display: flex; flex-direction: column; gap: 4px; }
     .plan-step {
       display: flex;

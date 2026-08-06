@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Browser Agent",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "自然语言驱动的网页自动化 Agent：点击、输入、滚动、导航、提取。",
   "permissions": ["activeTab", "scripting", "tabs", "sidePanel", "storage", "webNavigation"],
   "host_permissions": ["<all_urls>"],

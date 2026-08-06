@@ -2,6 +2,7 @@ const $ = (id) => document.getElementById(id);
 
 let runtime = null;
 let currentTask = null;
+let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
 
 function resetPlanProgress() {
@@ -12,11 +13,25 @@ function renderPlanPanel() {
   const panel = $("planPanel");
   if (!planProgress.steps.length) { panel.style.display = "none"; return; }
   panel.style.display = "block";
+  panel.classList.toggle("collapsed", planCollapsed);
   panel.innerHTML = "";
   const head = document.createElement("div");
   head.className = "plan-head";
-  head.textContent = "执行计划" + (planProgress.replanned ? "（已重规划）" : "");
+  const title = document.createElement("span");
+  title.textContent = "执行计划" + (planProgress.replanned ? "（已重规划）" : "");
+  head.appendChild(title);
+  const toggle = document.createElement("button");
+  toggle.className = "plan-toggle";
+  toggle.title = planCollapsed ? "展开计划" : "收起计划";
+  toggle.textContent = planCollapsed ? "▸" : "▾";
+  toggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    planCollapsed = !planCollapsed;
+    renderPlanPanel();
+  });
+  head.appendChild(toggle);
   panel.appendChild(head);
+  if (planCollapsed) return;
   const list = document.createElement("div");
   list.className = "plan-steps";
   planProgress.steps.forEach((desc, i) => {
