@@ -103,6 +103,15 @@ function createPageBridge() {
         return null; // requires "activeTab" or host permission; caller degrades gracefully
       }
     },
+    // Read the exact bitmap of a captcha canvas/img as a PNG data URL (much
+    // crisper than a full-page screenshot for small verification codes).
+    async captureCanvas(target) {
+      const frameId = target && target.frameId;
+      const res = await sendToTab(MSG.CANVAS_READ_REQUEST, { taskId: Date.now(), target: target || null }, frameId);
+      if (!res || res.type !== MSG.CANVAS_READ_RESPONSE) return null;
+      const result = res.payload && res.payload.result;
+      return result && result.ok ? result.value : null;
+    },
     // ── tab management (browser-level, no content script needed) ──
     async tabList() {
       const tabs = await chrome.tabs.query({});

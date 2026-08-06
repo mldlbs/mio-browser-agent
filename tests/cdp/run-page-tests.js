@@ -59,6 +59,17 @@ const { openTab, runInPage, report } = require("./page-runner");
       const capClick = executeAction({ name: "click", target: cap, args: {} });
       check(capClick.ok && window.__captchaClicks === 1, "executor clicks canvas captcha", capClick.ok);
 
+      // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）
+      const cctx = document.getElementById("captcha-canvas").getContext("2d");
+      cctx.fillStyle = "#fff"; cctx.fillRect(0, 0, 120, 40);
+      cctx.fillStyle = "#000"; cctx.font = "24px monospace"; cctx.fillText("3K9f", 10, 28);
+      const bmp = readCanvasBitmap(cap);
+      check(bmp.ok && typeof bmp.value === "string" && bmp.value.startsWith("data:image/png"),
+        "readCanvasBitmap returns exact canvas bitmap", (bmp && bmp.error) || (bmp.value || "").slice(0, 30));
+      const bmpNo = readCanvasBitmap({ cssPath: "#no-such-el" });
+      check(bmpNo.ok && bmpNo.value.startsWith("data:image/png"),
+        "readCanvasBitmap auto-locates captcha when locator misses", bmpNo && bmpNo.error);
+
       return out;
     `);
     const fails = report(results);

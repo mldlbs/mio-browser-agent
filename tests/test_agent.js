@@ -1365,6 +1365,24 @@ function assertEq(got, want, name) {
   const captchaNoShot = await captchaTool.execute({}, { llm: { generate: async () => ({ content: "1234" }) }, bridge: { capture: async () => null } });
   assert(!captchaNoShot.ok && /capture/.test(captchaNoShot.error), "read_captcha fails without capture");
 
+  // captureCanvas (exact bitmap) takes priority over the full-page screenshot.
+  const captchaBit = await captchaTool.execute({ index: 3 }, {
+    bridge: {
+      captureCanvas: async (t) => { assert(t && t.cssPath, "read_captcha passes element locator to captureCanvas"); return "data:image/png;base64,BBB"; },
+      capture: async () => "data:image/png;base64,AAA",
+    },
+    snapshot: { elements: [{ index: 3, role: "generic", name: "验证码(captcha)", cssPath: "#captcha", frameId: 0 }] },
+    llm: { generate: async (msgs, opts) => { assert(opts.images[0] === "data:image/png;base64,BBB", "captureCanvas bitmap used over screenshot"); return { content: "8B9K" }; } },
+  });
+  assert(captchaBit.ok && captchaBit.value === "8B9K", "read_captcha uses exact captcha bitmap");
+
+  // A 5-char result (visual model read noise as a digit) must be rejected.
+  const captcha5 = await captchaTool.execute({}, {
+    bridge: { capture: async () => "data:image/png;base64,AAA" },
+    llm: { generate: async () => ({ content: "4y97B" }) },
+  });
+  assert(!captcha5.ok, "5-char captcha read rejected");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();

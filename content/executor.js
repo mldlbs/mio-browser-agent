@@ -115,6 +115,53 @@ function executeAction(action) {
   return { ok: false, error: `unknown action: ${name}` };
 }
 
+// Read the exact bitmap of a captcha canvas/img element as a PNG data URL. A
+// full-page screenshot renders a small verification code as a few dozen pixels;
+// toDataURL() hands the vision model the crisp captcha pixels directly.
+function readCanvasBitmap(target) {
+  let el = null;
+  if (target && (target.cssPath || target.xpath || target.role || target.boundingBox)) {
+    el = locateElement(target);
+  }
+  if (!el) el = findCaptchaElement();
+  if (!el) return { ok: false, error: "no captcha canvas/img found on page" };
+  try {
+    let dataUrl;
+    if (el.tagName === "CANVAS") {
+      dataUrl = el.toDataURL();
+    } else if (el.tagName === "IMG") {
+      const c = document.createElement("canvas");
+      c.width = el.naturalWidth || el.width || 100;
+      c.height = el.naturalHeight || el.height || 40;
+      c.getContext("2d").drawImage(el, 0, 0);
+      dataUrl = c.toDataURL();
+    } else {
+      return { ok: false, error: `captcha element is <${el.tagName.toLowerCase()}>` };
+    }
+    if (!dataUrl || dataUrl.length < 64) return { ok: false, error: "captcha bitmap empty" };
+    return { ok: true, value: dataUrl };
+  } catch (e) {
+    return { ok: false, error: "captcha bitmap failed: " + ((e && e.message) || String(e)) };
+  }
+}
+
+function findCaptchaElement() {
+  const cands = Array.from(document.querySelectorAll("canvas,img"));
+  for (const el of cands) {
+    const cls = ((el.getAttribute && el.getAttribute("class")) || "").toLowerCase();
+    const alt = ((el.getAttribute && el.getAttribute("alt")) || "").toLowerCase();
+    if (/captcha|verify|验证码|rand|code/.test(cls) || /captcha|验证码/.test(alt)) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && r.height > 0) return el;
+    }
+  }
+  for (const el of cands) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && r.width <= 300 && r.height <= 160) return el;
+  }
+  return null;
+}
+
 // Extract readable page text (title, url, trimmed body text), capped at maxChars.
 function extractPageText(maxChars) {
   const body = document.body;
