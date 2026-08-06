@@ -42,32 +42,47 @@
 
 ## 🏗️ 架构
 
-```
-manifest.json                 扩展入口与权限
-background/service-worker.js  Service Worker 生命周期
-sidepanel/                    侧边面板 UI + Agent 运行时
-  sidepanel.html/js           界面与事件绑定
-  bridge.js                   与 content script 通信的页面桥
-  planner.js                  任务 → 步骤规划
-  memory.js                   页面访问记忆
-  executor.js                 单步执行循环
-  agent-runtime.js            Agent 总调度
-  recovery-*.js               恢复引擎（context/policy/engine）
-  runtime-protocol.js         LLM ↔ 动作协议
-  turn-handler.js             对话轮次管理
-  metrics.js                  执行指标统计
-content/                      注入页面的脚本
-  snapshot.js                 页面状态快照（元素、可交互节点）
-  locator.js                  选择器定位与多候选回退
-  executor.js                 页面内动作执行（click/type/…）
-  main.js                     content script 入口
-tools/                        工具定义与注册（registry.js）
-common/                       共享协议、存储、日志
-llm/                          LLM 适配层（openai 兼容）
-tests/                        单元测试（Node 直接运行）
+```mermaid
+graph TB
+  subgraph UI["sidepanel · 侧边面板与运行时"]
+    SUI["sidepanel.html/js — 界面 / 历史 / 收起"]
+    PLAN["planner.js — 任务规划"]
+    EXEC["executor.js — 步骤循环"]
+    RT["agent-runtime.js — 总调度"]
+    REC["recovery-*.js — 恢复引擎"]
+    MEM["memory.js — 访问记忆"]
+    VISION["vision.js — 视觉模型"]
+    BRIDGE["bridge.js — 页面桥"]
+    TURN["turn-handler.js — LLM 轮次"]
+  end
+  subgraph CONTENT["content · 注入页面"]
+    SNAP["snapshot.js — 页面快照"]
+    LOC["locator.js — 元素定位"]
+    CEXEC["executor.js — 页面动作"]
+    CM["main.js — 消息分发"]
+  end
+  subgraph TOOLS["tools · 工具集"]
+    T_BASIC["click / type / scroll / navigate / wait"]
+    T_EXT["extract_text / paste / tab"]
+    T_CAPTCHA["read_captcha.js — 验证码位图"]
+  end
+  LLM["llm · OpenAI 兼容适配层"]
+  COMMON["common · 协议 / 存储 / 日志"]
+
+  SUI --> PLAN --> RT --> EXEC
+  EXEC --> TURN --> LLM
+  EXEC --> REC
+  EXEC --> TOOLS
+  EXEC --> BRIDGE --> CM
+  CM --> CEXEC
+  CEXEC --> SNAP --> CM
+  CM --> LOC --> CEXEC
+  BRIDGE <--> COMMON <--> CM
+  VISION --> LLM
+  MEM --> EXEC
 ```
 
-数据流：`sidepanel/planner.js` 规划 → `agent-runtime.js` 循环调用 `executor.js` → `bridge.js` 通知 `content/main.js` 执行 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
+数据流：`planner.js` 规划 → `agent-runtime.js` 调度 `executor.js` 逐步骤执行 → `bridge.js` 通知 `content/main.js` 在页面内动作 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
 
 ## 🧪 测试
 
