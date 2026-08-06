@@ -129,7 +129,22 @@ async function init() {
 function toggleHistory() {
   const view = $("historyView");
   const showing = view.classList.toggle("open");
-  if (showing) renderHistory();
+  const log = $("log");
+  const plan = $("planPanel");
+  if (showing) {
+    // History list and log/plan panels are both flex:1 — hide the panels while
+    // browsing history so the list gets the full height and its own scrollbar.
+    log.style.display = "none";
+    if (plan.style.display !== "none") {
+      plan.dataset.prevDisplay = plan.style.display || "";
+    }
+    plan.style.display = "none";
+    renderHistory();
+  } else {
+    log.style.display = "";
+    plan.style.display = plan.dataset.prevDisplay || "none";
+    delete plan.dataset.prevDisplay;
+  }
 }
 
 async function clearHistory() {
