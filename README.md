@@ -15,56 +15,54 @@
 
 ```mermaid
 graph TB
-  User(["🎯 用户目标"]):::user --> UI
+  User(["🎯 用户目标"]):::user
 
   subgraph SP["sidepanel · Agent 运行时"]
-    UI["sidepanel.html/js"]:::sp
-    PLAN["planner.js"]:::sp
+    UI["sidepanel.html/js（界面 · 历史 · 收起）"]:::sp
+    PL["planner.js"]:::sp
     RT["agent-runtime.js"]:::sp
-    EXEC["executor.js"]:::sp
-    TURN["turn-handler.js"]:::sp
-    REC["recovery-*.js"]:::sp
+    EX["executor.js"]:::sp
+    TH["turn-handler.js"]:::sp
+    RC["recovery-*.js"]:::sp
     MEM["memory.js"]:::sp
-    VISION["vision.js"]:::sp
-    BRIDGE["bridge.js"]:::sp
+    TO["click · type · scroll · navigate · wait · extract_text · paste · tab · read_captcha"]:::sp
+    BR["bridge.js"]:::sp
   end
 
   subgraph CS["content · 注入页面"]
-    MAIN["main.js"]:::cs
-    SNAP["snapshot.js"]:::cs
-    LOC["locator.js"]:::cs
-    CEXEC["executor.js"]:::cs
-  end
-
-  subgraph TO["tools · 工具集"]
-    T1["click · type · scroll · navigate · wait"]:::to
-    T2["extract_text · paste · tab"]:::to
-    T3["read_captcha（验证码位图）"]:::to
+    M["main.js"]:::cs
+    S["snapshot.js"]:::cs
+    L["locator.js"]:::cs
+    CE["executor.js"]:::cs
   end
 
   subgraph CO["llm · common"]
     LLM["LLM 适配层"]:::co
-    PROTO["协议 · 存储 · 日志"]:::co
+    V["vision.js"]:::co
+    PR["protocol · storage · logger"]:::co
   end
 
-  UI --> PLAN --> RT --> EXEC
-  EXEC --> TURN --> LLM
-  EXEC --> REC
-  EXEC --> TO
-  EXEC --> BRIDGE
-  BRIDGE <--> PROTO <--> MAIN
-  MAIN --> CEXEC
-  CEXEC --> SNAP
-  SNAP --> MAIN
-  MAIN --> LOC --> CEXEC
-  VISION --> LLM
-  MEM --> EXEC
-  LLM --> EXEC
+  User --> UI
+  UI --> PL --> RT --> EX
+  EX --> TH
+  TH --> LLM
+  LLM --> TH
+  EX --> RC
+  EX --> MEM
+  EX --> TO
+  EX --> BR
+  BR <--> PR
+  PR <--> M
+  M --> CE
+  M --> S
+  S --> M
+  M --> L
+  L --> CE
+  V --> LLM
 
   classDef user fill:#f5c2e7,stroke:#f5c2e7,color:#11111b,font-weight:bold
   classDef sp fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
   classDef cs fill:#181825,stroke:#b4befe,color:#cdd6f4
-  classDef to fill:#181825,stroke:#94e2d5,color:#cdd6f4
   classDef co fill:#181825,stroke:#f9e2af,color:#cdd6f4
 ```
 
