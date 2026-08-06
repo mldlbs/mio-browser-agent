@@ -4,7 +4,7 @@
 // a vision-capable model. Pairs with the snapshot now listing <canvas> elements.
 registerTool({
   name: "read_captcha",
-  description: "Screenshot the visible page and read the captcha code drawn on the canvas (usually 4 alphanumeric characters). Use when a login form has a canvas captcha image that must be entered before submitting.",
+  description: "Screenshot the visible page and read the login verification code (验证码/captcha) drawn on the canvas or img, usually 4 alphanumeric characters. This is the ONLY tool for reading captchas — it captures the page itself and asks the vision model, so no separate screenshot tool is needed. Use it whenever a login form has a captcha that must be entered before submitting. If the code looks unreadable, click the captcha image first to refresh it, then call read_captcha again.",
   parameters: {
     type: "object",
     properties: {},
