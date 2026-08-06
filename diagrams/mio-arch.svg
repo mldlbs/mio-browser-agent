@@ -51,145 +51,145 @@
   <text x="118.0" y="724.0" class="section">注入页面</text>
     <rect id="ct-header" data-graph-role="reserved" data-reserved-kind="container-header" x="108" y="706" width="82" height="30" fill="none" stroke="none"/>
   </g>
-  <path id="edge-000" data-graph-role="edge" data-edge-id="edge-000" data-source="user" data-target="ui" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 220,200 L 220,280" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-001" data-graph-role="edge" data-edge-id="edge-001" data-source="ui" data-target="pl" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 340,316 L 400,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-002" data-graph-role="edge" data-edge-id="edge-002" data-source="pl" data-target="rt" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,316 L 700,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-003" data-graph-role="edge" data-edge-id="edge-003" data-source="rt" data-target="th" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 940,316 L 1000,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-004" data-graph-role="edge" data-edge-id="edge-004" data-source="rt" data-target="ex" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 820,352 L 820,376 L 520,376 L 520,410" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-005" data-graph-role="edge" data-edge-id="edge-005" data-source="ex" data-target="tools" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 400,437 L 340,437 L 340,446 L 340,446" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-006" data-graph-role="edge" data-edge-id="edge-006" data-source="ex" data-target="rc" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 640,446 L 700,446" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-007" data-graph-role="edge" data-edge-id="edge-007" data-source="ex" data-target="mem" data-edge-kind="flow" data-topic-id="" data-flow="write" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 520,482 L 520,506 L 220,506 L 220,540" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-008-bridge-mask" data-graph-role="bridge-mask" data-owner="edge-008" d="M 400,455 L 389,455 L 389,501 A 5 5 0 0 1 389,511 L 389,519.6 L 520,519.6 L 520,540" fill="none" stroke="#ffffff" stroke-width="6.3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path id="edge-008" data-graph-role="edge" data-edge-id="edge-008" data-source="ex" data-target="br" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="3" data-route-stretch="1.107" data-bridges="389,506" d="M 400,455 L 389,455 L 389,501 A 5 5 0 0 1 389,511 L 389,519.6 L 520,519.6 L 520,540" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-009" data-graph-role="edge" data-edge-id="edge-009" data-source="th" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 1096,280 L 1096,240" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
-  <path id="edge-010" data-graph-role="edge" data-edge-id="edge-010" data-source="llm" data-target="th" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 1114,240 L 1114,280" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
-  <path id="edge-011" data-graph-role="edge" data-edge-id="edge-011" data-source="vision" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.092" data-bridges="" d="M 1180,570 L 1234,570 L 1234,190 L 1215,190" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
-  <path id="edge-012" data-graph-role="edge" data-edge-id="edge-012" data-source="br" data-target="main" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 520,600 L 520,750" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-013" data-graph-role="edge" data-edge-id="edge-013" data-source="main" data-target="cex" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 493,822 L 493,840 L 220,840 L 220,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-014" data-graph-role="edge" data-edge-id="edge-014" data-source="main" data-target="snap" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 511,822 L 511,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-015" data-graph-role="edge" data-edge-id="edge-015" data-source="snap" data-target="main" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 529,880 L 529,822" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-016" data-graph-role="edge" data-edge-id="edge-016" data-source="main" data-target="loc" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 547,822 L 547,832.2 L 820,832.2 L 820,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-017" data-graph-role="edge" data-edge-id="edge-017" data-source="cex" data-target="web" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 220,952 L 220,1010" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <path id="edge-018" data-graph-role="edge" data-edge-id="edge-018" data-source="web" data-target="snap" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 340,1032 L 520,1032 L 520,952" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
-  <g id="node-user" data-graph-role="node" data-node-id="user" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="120,150,320,200">
-  <rect x="120.0" y="150.0" width="200.0" height="50.0" rx="4.0" fill="#eef6f0" stroke="#10b981" stroke-width="1.8"/>
-  <text x="220.0" y="175.0" text-anchor="middle" class="node-title" font-size="18.0">用户目标</text>
+  <path id="edge-000" data-graph-role="edge" data-edge-id="edge-000" data-source="user" data-target="ui" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 260,200 L 260,280" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-001" data-graph-role="edge" data-edge-id="edge-001" data-source="ui" data-target="pl" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 380,316 L 440,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-002" data-graph-role="edge" data-edge-id="edge-002" data-source="pl" data-target="rt" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 680,316 L 740,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-003" data-graph-role="edge" data-edge-id="edge-003" data-source="rt" data-target="th" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 980,316 L 1040,316" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-004" data-graph-role="edge" data-edge-id="edge-004" data-source="rt" data-target="ex" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 860,352 L 860,376 L 560,376 L 560,410" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-005" data-graph-role="edge" data-edge-id="edge-005" data-source="ex" data-target="tools" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 440,437 L 380,437 L 380,446 L 380,446" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-006" data-graph-role="edge" data-edge-id="edge-006" data-source="ex" data-target="rc" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 680,446 L 740,446" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-007" data-graph-role="edge" data-edge-id="edge-007" data-source="ex" data-target="mem" data-edge-kind="flow" data-topic-id="" data-flow="write" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 560,482 L 560,506 L 260,506 L 260,540" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-008-bridge-mask" data-graph-role="bridge-mask" data-owner="edge-008" d="M 440,455 L 429,455 L 429,501 A 5 5 0 0 1 429,511 L 429,519.6 L 560,519.6 L 560,540" fill="none" stroke="#ffffff" stroke-width="6.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path id="edge-008" data-graph-role="edge" data-edge-id="edge-008" data-source="ex" data-target="br" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="3" data-route-stretch="1.107" data-bridges="429,506" d="M 440,455 L 429,455 L 429,501 A 5 5 0 0 1 429,511 L 429,519.6 L 560,519.6 L 560,540" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-009" data-graph-role="edge" data-edge-id="edge-009" data-source="th" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 1136,280 L 1136,240" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
+  <path id="edge-010" data-graph-role="edge" data-edge-id="edge-010" data-source="llm" data-target="th" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 1154,240 L 1154,280" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
+  <path id="edge-011" data-graph-role="edge" data-edge-id="edge-011" data-source="vision" data-target="llm" data-edge-kind="flow" data-topic-id="" data-flow="feedback" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.092" data-bridges="" d="M 1220,570 L 1274,570 L 1274,190 L 1255,190" fill="none" stroke="#9ca3af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowF)"/>
+  <path id="edge-012" data-graph-role="edge" data-edge-id="edge-012" data-source="br" data-target="main" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 560,600 L 560,750" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-013" data-graph-role="edge" data-edge-id="edge-013" data-source="main" data-target="cex" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 533,822 L 533,840 L 260,840 L 260,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-014" data-graph-role="edge" data-edge-id="edge-014" data-source="main" data-target="snap" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 551,822 L 551,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-015" data-graph-role="edge" data-edge-id="edge-015" data-source="snap" data-target="main" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 569,880 L 569,822" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-016" data-graph-role="edge" data-edge-id="edge-016" data-source="main" data-target="loc" data-edge-kind="flow" data-topic-id="" data-flow="control" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="2" data-route-stretch="1.0" data-bridges="" d="M 587,822 L 587,832.2 L 860,832.2 L 860,880" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-017" data-graph-role="edge" data-edge-id="edge-017" data-source="cex" data-target="web" data-edge-kind="flow" data-topic-id="" data-flow="data" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="0" data-route-stretch="1.0" data-bridges="" d="M 260,952 L 260,1010" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <path id="edge-018" data-graph-role="edge" data-edge-id="edge-018" data-source="web" data-target="snap" data-edge-kind="flow" data-topic-id="" data-flow="read" data-motion-role="" data-motion-stage="" data-motion-order="" data-protocol="" data-via="" data-critical-path-id="" data-critical-hop="" data-critical-hops="" data-critical="false" data-bends="1" data-route-stretch="1.0" data-bridges="" d="M 380,1032 L 560,1032 L 560,952" fill="none" stroke="#3b82f6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#arrowA)"/>
+  <g id="node-user" data-graph-role="node" data-node-id="user" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="160,150,360,200">
+  <rect x="160.0" y="150.0" width="200.0" height="50.0" rx="4.0" fill="#eef6f0" stroke="#10b981" stroke-width="1.8"/>
+  <text x="260.0" y="175.0" text-anchor="middle" class="node-title" font-size="18.0">用户目标</text>
   </g>
-  <g id="node-llm" data-graph-role="node" data-node-id="llm" data-semantic-role="double_rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="995,140,1215,240">
-  <rect x="995.0" y="140.0" width="220.0" height="100.0" rx="4.0" fill="#f3eefc" stroke="#a855f7" stroke-width="2.0"/>
-  <rect x="1001.0" y="146.0" width="208.0" height="88.0" rx="4" fill="none" stroke="#a855f7" stroke-width="1.2" opacity="0.65"/>
-  <text x="1105.0" y="190.0" text-anchor="middle" class="node-title" font-size="18.0">LLM 适配层</text>
-  <text x="1105.0" y="212.0" text-anchor="middle" class="node-sub">OpenAI 兼容 · 可选视觉模型</text>
+  <g id="node-llm" data-graph-role="node" data-node-id="llm" data-semantic-role="double_rect" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="1035,140,1255,240">
+  <rect x="1035.0" y="140.0" width="220.0" height="100.0" rx="4.0" fill="#f3eefc" stroke="#a855f7" stroke-width="2.0"/>
+  <rect x="1041.0" y="146.0" width="208.0" height="88.0" rx="4" fill="none" stroke="#a855f7" stroke-width="1.2" opacity="0.65"/>
+  <text x="1145.0" y="190.0" text-anchor="middle" class="node-title" font-size="18.0">LLM 适配层</text>
+  <text x="1145.0" y="212.0" text-anchor="middle" class="node-sub">OpenAI 兼容 · 可选视觉模型</text>
   </g>
-  <g id="node-ui" data-graph-role="node" data-node-id="ui" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="100,280,340,352">
-  <rect x="100.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="220.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">sidepanel.html/js</text>
-  <text x="220.0" y="338.0" text-anchor="middle" class="node-sub">界面 · 历史 · 收起</text>
+  <g id="node-ui" data-graph-role="node" data-node-id="ui" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="140,280,380,352">
+  <rect x="140.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="260.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">sidepanel.html/js</text>
+  <text x="260.0" y="338.0" text-anchor="middle" class="node-sub">界面 · 历史 · 收起</text>
   </g>
-  <g id="node-pl" data-graph-role="node" data-node-id="pl" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="400,280,640,352">
-  <rect x="400.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="520.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">planner.js</text>
-  <text x="520.0" y="338.0" text-anchor="middle" class="node-sub">目标 → 步骤规划</text>
+  <g id="node-pl" data-graph-role="node" data-node-id="pl" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="440,280,680,352">
+  <rect x="440.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="560.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">planner.js</text>
+  <text x="560.0" y="338.0" text-anchor="middle" class="node-sub">目标 → 步骤规划</text>
   </g>
-  <g id="node-rt" data-graph-role="node" data-node-id="rt" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="700,280,940,352">
-  <rect x="700.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="820.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">agent-runtime.js</text>
-  <text x="820.0" y="338.0" text-anchor="middle" class="node-sub">任务总调度</text>
+  <g id="node-rt" data-graph-role="node" data-node-id="rt" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="740,280,980,352">
+  <rect x="740.0" y="280.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="860.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">agent-runtime.js</text>
+  <text x="860.0" y="338.0" text-anchor="middle" class="node-sub">任务总调度</text>
   </g>
-  <g id="node-th" data-graph-role="node" data-node-id="th" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="1000,280,1210,352">
-  <rect x="1000.0" y="280.0" width="210.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="1105.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">turn-handler.js</text>
-  <text x="1105.0" y="338.0" text-anchor="middle" class="node-sub">LLM 轮次</text>
+  <g id="node-th" data-graph-role="node" data-node-id="th" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="1040,280,1250,352">
+  <rect x="1040.0" y="280.0" width="210.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="1145.0" y="316.0" text-anchor="middle" class="node-title" font-size="18.0">turn-handler.js</text>
+  <text x="1145.0" y="338.0" text-anchor="middle" class="node-sub">LLM 轮次</text>
   </g>
-  <g id="node-tools" data-graph-role="node" data-node-id="tools" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="100,410,340,482">
-  <rect x="100.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="220.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">工具集 Tools</text>
-  <text x="220.0" y="468.0" text-anchor="middle" class="node-sub">click · type · scroll · navigate · paste · read_captcha</text>
+  <g id="node-tools" data-graph-role="node" data-node-id="tools" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="140,410,380,482">
+  <rect x="140.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="260.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">工具集 Tools</text>
+  <text x="260.0" y="468.0" text-anchor="middle" class="node-sub">click · type · scroll · navigate · paste · read_captcha</text>
   </g>
-  <g id="node-ex" data-graph-role="node" data-node-id="ex" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="400,410,640,482">
-  <rect x="400.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="520.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">executor.js</text>
-  <text x="520.0" y="468.0" text-anchor="middle" class="node-sub">步骤执行循环</text>
+  <g id="node-ex" data-graph-role="node" data-node-id="ex" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="440,410,680,482">
+  <rect x="440.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="560.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">executor.js</text>
+  <text x="560.0" y="468.0" text-anchor="middle" class="node-sub">步骤执行循环</text>
   </g>
-  <g id="node-rc" data-graph-role="node" data-node-id="rc" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="700,410,940,482">
-  <rect x="700.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="820.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">recovery-*.js</text>
-  <text x="820.0" y="468.0" text-anchor="middle" class="node-sub">自愈 · 重试 · 重规划</text>
+  <g id="node-rc" data-graph-role="node" data-node-id="rc" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="740,410,980,482">
+  <rect x="740.0" y="410.0" width="240.0" height="72.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="860.0" y="446.0" text-anchor="middle" class="node-title" font-size="18.0">recovery-*.js</text>
+  <text x="860.0" y="468.0" text-anchor="middle" class="node-sub">自愈 · 重试 · 重规划</text>
   </g>
-  <g id="node-br" data-graph-role="node" data-node-id="br" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="400,540,640,600">
-  <rect x="400.0" y="540.0" width="240.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="520.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">bridge.js</text>
-  <text x="520.0" y="592.0" text-anchor="middle" class="node-sub">与页面桥接</text>
+  <g id="node-br" data-graph-role="node" data-node-id="br" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="440,540,680,600">
+  <rect x="440.0" y="540.0" width="240.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="560.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">bridge.js</text>
+  <text x="560.0" y="592.0" text-anchor="middle" class="node-sub">与页面桥接</text>
   </g>
-  <g id="node-mem" data-graph-role="node" data-node-id="mem" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="100,540,340,600">
-  <rect x="100.0" y="540.0" width="240.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="220.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">memory.js</text>
-  <text x="220.0" y="592.0" text-anchor="middle" class="node-sub">页面访问记忆</text>
+  <g id="node-mem" data-graph-role="node" data-node-id="mem" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="140,540,380,600">
+  <rect x="140.0" y="540.0" width="240.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="260.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">memory.js</text>
+  <text x="260.0" y="592.0" text-anchor="middle" class="node-sub">页面访问记忆</text>
   </g>
-  <g id="node-vision" data-graph-role="node" data-node-id="vision" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="1050,540,1180,600">
-  <rect x="1050.0" y="540.0" width="130.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
-  <text x="1115.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">vision.js</text>
-  <text x="1115.0" y="592.0" text-anchor="middle" class="node-sub">视觉模型</text>
+  <g id="node-vision" data-graph-role="node" data-node-id="vision" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="1090,540,1220,600">
+  <rect x="1090.0" y="540.0" width="130.0" height="60.0" rx="4.0" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.8"/>
+  <text x="1155.0" y="570.0" text-anchor="middle" class="node-title" font-size="18.0">vision.js</text>
+  <text x="1155.0" y="592.0" text-anchor="middle" class="node-sub">视觉模型</text>
   </g>
-  <g id="node-main" data-graph-role="node" data-node-id="main" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="260,750,780,822">
-  <rect x="260.0" y="750.0" width="520.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
-  <text x="520.0" y="786.0" text-anchor="middle" class="node-title" font-size="18.0">main.js</text>
-  <text x="520.0" y="808.0" text-anchor="middle" class="node-sub">消息分发</text>
+  <g id="node-main" data-graph-role="node" data-node-id="main" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="300,750,820,822">
+  <rect x="300.0" y="750.0" width="520.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
+  <text x="560.0" y="786.0" text-anchor="middle" class="node-title" font-size="18.0">main.js</text>
+  <text x="560.0" y="808.0" text-anchor="middle" class="node-sub">消息分发</text>
   </g>
-  <g id="node-cex" data-graph-role="node" data-node-id="cex" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="100,880,340,952">
-  <rect x="100.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
-  <text x="220.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">content/executor.js</text>
-  <text x="220.0" y="938.0" text-anchor="middle" class="node-sub">页面内动作</text>
+  <g id="node-cex" data-graph-role="node" data-node-id="cex" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="140,880,380,952">
+  <rect x="140.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
+  <text x="260.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">content/executor.js</text>
+  <text x="260.0" y="938.0" text-anchor="middle" class="node-sub">页面内动作</text>
   </g>
-  <g id="node-snap" data-graph-role="node" data-node-id="snap" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="400,880,640,952">
-  <rect x="400.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
-  <text x="520.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">snapshot.js</text>
-  <text x="520.0" y="938.0" text-anchor="middle" class="node-sub">页面快照</text>
+  <g id="node-snap" data-graph-role="node" data-node-id="snap" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="440,880,680,952">
+  <rect x="440.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
+  <text x="560.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">snapshot.js</text>
+  <text x="560.0" y="938.0" text-anchor="middle" class="node-sub">页面快照</text>
   </g>
-  <g id="node-loc" data-graph-role="node" data-node-id="loc" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="700,880,940,952">
-  <rect x="700.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
-  <text x="820.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">locator.js</text>
-  <text x="820.0" y="938.0" text-anchor="middle" class="node-sub">元素定位</text>
+  <g id="node-loc" data-graph-role="node" data-node-id="loc" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="740,880,980,952">
+  <rect x="740.0" y="880.0" width="240.0" height="72.0" rx="4.0" fill="#eef6f0" stroke="#3b82f6" stroke-width="1.8"/>
+  <text x="860.0" y="916.0" text-anchor="middle" class="node-title" font-size="18.0">locator.js</text>
+  <text x="860.0" y="938.0" text-anchor="middle" class="node-sub">元素定位</text>
   </g>
-  <g id="node-web" data-graph-role="node" data-node-id="web" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="100,1010,340,1054">
-  <rect x="100.0" y="1010.0" width="240.0" height="44.0" rx="4.0" fill="#eef6f0" stroke="#10b981" stroke-width="1.8"/>
-  <text x="220.0" y="1032.0" text-anchor="middle" class="node-title" font-size="18.0">浏览器网页</text>
+  <g id="node-web" data-graph-role="node" data-node-id="web" data-semantic-role="node" data-motion-role="" data-motion-stage="" data-motion-order="" data-parent="" data-deployment-id="" data-topic-id="" data-span-id="" data-station-order="" data-status="" data-start-ms="" data-duration-ms="" data-parent-span="" data-graph-bounds="140,1010,380,1054">
+  <rect x="140.0" y="1010.0" width="240.0" height="44.0" rx="4.0" fill="#eef6f0" stroke="#10b981" stroke-width="1.8"/>
+  <text x="260.0" y="1032.0" text-anchor="middle" class="node-title" font-size="18.0">浏览器网页</text>
   </g>
-  <g id="edge-000-label" data-graph-role="label" data-owner="edge-000" data-graph-bounds="187,230,249,250">
-  <rect x="187.0" y="230.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="218.0" y="244.0" text-anchor="middle" class="arrow-label">目标任务</text>
+  <g id="edge-000-label" data-graph-role="label" data-owner="edge-000" data-graph-bounds="195,226,257,246">
+  <rect x="195.0" y="226.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="226.0" y="240.0" text-anchor="middle" class="arrow-label">目标任务</text>
   </g>
-  <g id="edge-007-label" data-graph-role="label" data-owner="edge-007" data-graph-bounds="351,475,389,495">
-  <rect x="351.0" y="475.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="370.0" y="489.0" text-anchor="middle" class="arrow-label">记忆</text>
+  <g id="edge-007-label" data-graph-role="label" data-owner="edge-007" data-graph-bounds="391,475,429,495">
+  <rect x="391.0" y="475.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="410.0" y="489.0" text-anchor="middle" class="arrow-label">记忆</text>
   </g>
-  <g id="edge-009-label" data-graph-role="label" data-owner="edge-009" data-graph-bounds="1055,246,1093,266">
-  <rect x="1055.0" y="246.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="1074.0" y="260.0" text-anchor="middle" class="arrow-label">推理</text>
+  <g id="edge-009-label" data-graph-role="label" data-owner="edge-009" data-graph-bounds="1095,246,1133,266">
+  <rect x="1095.0" y="246.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="1114.0" y="260.0" text-anchor="middle" class="arrow-label">推理</text>
   </g>
-  <g id="edge-010-label" data-graph-role="label" data-owner="edge-010" data-graph-bounds="1105,250,1143,270">
-  <rect x="1105.0" y="250.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="1124.0" y="264.0" text-anchor="middle" class="arrow-label">决策</text>
+  <g id="edge-010-label" data-graph-role="label" data-owner="edge-010" data-graph-bounds="1145,250,1183,270">
+  <rect x="1145.0" y="250.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="1164.0" y="264.0" text-anchor="middle" class="arrow-label">决策</text>
   </g>
-  <g id="edge-011-label" data-graph-role="label" data-owner="edge-011" data-graph-bounds="1193,366,1231,386">
-  <rect x="1193.0" y="366.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="1212.0" y="380.0" text-anchor="middle" class="arrow-label">视觉</text>
+  <g id="edge-011-label" data-graph-role="label" data-owner="edge-011" data-graph-bounds="1233,366,1271,386">
+  <rect x="1233.0" y="366.0" width="38.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="1252.0" y="380.0" text-anchor="middle" class="arrow-label">视觉</text>
   </g>
-  <g id="edge-012-label" data-graph-role="label" data-owner="edge-012" data-graph-bounds="455,661,517,681">
-  <rect x="455.0" y="661.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="486.0" y="675.0" text-anchor="middle" class="arrow-label">协议消息</text>
+  <g id="edge-012-label" data-graph-role="label" data-owner="edge-012" data-graph-bounds="495,661,557,681">
+  <rect x="495.0" y="661.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="526.0" y="675.0" text-anchor="middle" class="arrow-label">协议消息</text>
   </g>
-  <g id="edge-015-label" data-graph-role="label" data-owner="edge-015" data-graph-bounds="532,837,594,857">
-  <rect x="532.0" y="837.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="563.0" y="851.0" text-anchor="middle" class="arrow-label">快照回传</text>
+  <g id="edge-015-label" data-graph-role="label" data-owner="edge-015" data-graph-bounds="572,837,634,857">
+  <rect x="572.0" y="837.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="603.0" y="851.0" text-anchor="middle" class="arrow-label">快照回传</text>
   </g>
-  <g id="edge-017-label" data-graph-role="label" data-owner="edge-017" data-graph-bounds="155,967,217,987">
-  <rect x="155.0" y="967.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="186.0" y="981.0" text-anchor="middle" class="arrow-label">操作网页</text>
+  <g id="edge-017-label" data-graph-role="label" data-owner="edge-017" data-graph-bounds="195,967,257,987">
+  <rect x="195.0" y="967.0" width="62.0" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="226.0" y="981.0" text-anchor="middle" class="arrow-label">操作网页</text>
   </g>
-  <g id="edge-018-label" data-graph-role="label" data-owner="edge-018" data-graph-bounds="396.96,1001,463.04,1021">
-  <rect x="396.96" y="1001.0" width="66.08" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
-  <text x="430.0" y="1015.0" text-anchor="middle" class="arrow-label">DOM 数据</text>
+  <g id="edge-018-label" data-graph-role="label" data-owner="edge-018" data-graph-bounds="436.96,1001,503.04,1021">
+  <rect x="436.96" y="1001.0" width="66.08" height="20" rx="6" fill="#ffffff" opacity="0.96"/>
+  <text x="470.0" y="1015.0" text-anchor="middle" class="arrow-label">DOM 数据</text>
   </g>
   <g id="legend" data-graph-role="legend">
     <rect id="legend-zone" data-graph-role="reserved" data-reserved-kind="legend" x="1192.4" y="942" width="135.6" height="134" rx="10" fill="none" stroke="none"/>
