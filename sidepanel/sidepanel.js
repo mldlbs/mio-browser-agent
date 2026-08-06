@@ -143,6 +143,15 @@ async function init() {
   $("historyClear").addEventListener("click", clearHistory);
   $("historyExport").addEventListener("click", exportHistory);
   $("historySearch").addEventListener("input", renderHistory);
+  $("collapsePanel").addEventListener("click", async () => {
+    if (currentTask) await runtime && runtime.stop();
+    try {
+      await chrome.sidePanel.close({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+    } catch (_) {
+      // Chrome < 141 has no sidePanel.close; fall back to window.close().
+      try { window.close(); } catch (_) {}
+    }
+  });
 }
 
 function toggleHistory() {
