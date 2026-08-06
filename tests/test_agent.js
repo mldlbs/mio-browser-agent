@@ -622,6 +622,50 @@ function assertEq(got, want, name) {
   assert(autoFinishRes.ok, "repeated completion text auto-finishes the step instead of exhausting recovery");
   assert(autoFinishRes.summary.includes("added"), "auto-finish carries the agent's completion text as summary");
 
+  // ── first "done" narration without tools gets ONE correction before auto-end ──
+  // The correction turns a "I already did everything" skip into a real action, so
+  // steps that still need work are not silently dropped. Two identical narrations
+  // still auto-finish (bounded), but a corrected agent executes the tool.
+  const correctedLlm = mockLlm([
+    () => ({ content: "已完成", toolCalls: [] }),                                     // narration #1 → correction injected
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),         // corrected → actually acts
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了登录" })] }),
+  ]);
+  let correctedClicks = 0;
+  const correctedRes = await executorMod.executeStep(
+    { description: "点击登录" },
+    {
+      llm: correctedLlm,
+      bridge: {
+        snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }),
+        executeAction: async () => { correctedClicks++; return { ok: true, value: "clicked" }; },
+      },
+      memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 10, maxRecoveryAttempts: 5,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "点击登录" }] }, goal: "g",
+    }
+  );
+  assert(correctedRes.ok, "corrected narration turns into a real action");
+  assertEq(correctedClicks, 1, "correction drives the agent to execute the click");
+
+  // Two identical completion narrations still auto-finish (bounded, no loop).
+  const boundedLlm = mockLlm([
+    () => ({ content: "已完成", toolCalls: [] }),
+    () => ({ content: "已完成", toolCalls: [] }),
+    () => ({ content: "should not be reached", toolCalls: [] }),
+  ]);
+  const boundedRes = await executorMod.executeStep(
+    { description: "t" },
+    {
+      llm: boundedLlm, bridge: { snapshot: async () => snapShots[0] }, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 10, maxRecoveryAttempts: 5,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "t" }] }, goal: "g",
+    }
+  );
+  assert(boundedRes.ok, "repeated identical completion narrations stay bounded and auto-finish");
+
   // ── agent-runtime integration ──
   const rtBridge = {
     snapshot: async () => snapShots[0],

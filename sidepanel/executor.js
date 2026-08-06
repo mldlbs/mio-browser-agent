@@ -39,7 +39,8 @@ Use tools to manipulate the page. Rules:
 - A fresh snapshot is provided after every action; inspect it before the next action.
 - If an element is missing, wait or scroll; never assume it exists.
 - When the current step is complete, call finish with a one-line summary of what you did.
-- If the current step's goal is already achieved (e.g. the information was found in a previous step), call finish immediately; do not loop.
+- finish marks the CURRENT step complete; the system then advances you to the next step. It does not end the whole task.
+- If the current step is purely informational and the needed information is already in the conversation, you may call finish immediately. But if the step requires an action (typing, clicking, sending, extracting), execute that action with tools FIRST — never declare a step complete without doing its required action.
 - Never claim success you cannot verify.
 - Links show their destination after '→'. On shopping/search pages prefer product-card links (e.g. href containing /item/, /dp/, /product/) over shop or category links (e.g. /store/, /shop/, /seller/). Avoid clicking a shop link when you want a product.
 - To find another product later, first finish the current step; the system advances you to the next step.
@@ -73,6 +74,7 @@ async function executeStep(step, ctx) {
   // rich editors (ProseMirror/React) desync the DOM from their internal state.
   if (ctx._lastClick === undefined) ctx._lastClick = null;
   if (ctx._actionsSinceLastClick === undefined) ctx._actionsSinceLastClick = 0;
+  ctx.silentDoneRounds = 0;
   
   // Turn-based execution
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -124,12 +126,21 @@ async function executeStep(step, ctx) {
     
     // Handle tool calls
     if (!toolCalls.length) {
-      // Silent round - trigger recovery
+      // Silent round - no tool call. Usually flows to recovery; but if the agent
+      // keeps narrating completion without acting, end the step.
       onLog("llm", "返回文本，继续观察: " + (resp.content || "").slice(0, 120));
-      // If the agent keeps narrating completion without acting, end the step
       const text = (resp.content || "").toLowerCase();
       const looksDone = /complete|completed|done|finish|finished|already|successfully|added|成功|完成|已/.test(text);
       ctx.silentDoneRounds = (ctx.silentDoneRounds || 0) + (looksDone ? 1 : 0);
+      // First "done" narration with zero tool calls gets ONE explicit correction
+      // before auto-ending: a step that needs an action (send/extract/click) must
+      // not be silently skipped just because the agent believes the whole task is
+      // already finished.
+      if (looksDone && ctx.silentDoneRounds === 1) {
+        ctx.history.push({ role: "user", content: "注意：你上一轮只写了叙述而没有调用工具，也没有调用 finish。若当前步骤确已完成，请直接调用 finish 并附一行总结；若本步骤还需动作（输入/点击/发送/提取等），请调用相应工具执行。仅叙述完成不会推进进度。" });
+        onLog("recovery", "NO_TOOL_CALLS 注入纠正: 仅叙述完成无效，需调用 finish 或执行工具");
+        continue;
+      }
       if (ctx.silentDoneRounds >= 2) {
         ctx.silentDoneRounds = 0;
         onLog("finish", "静默轮次重复声明完成，自动结束当前步骤: " + (resp.content || "").slice(0, 120));
