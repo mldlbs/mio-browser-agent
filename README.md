@@ -13,58 +13,9 @@
 
 ## 🏗️ 架构
 
-```mermaid
-graph TB
-  User(["🎯 用户目标"]):::user
-
-  subgraph SP["sidepanel · Agent 运行时"]
-    UI["sidepanel.html/js（界面 · 历史 · 收起）"]:::sp
-    PL["planner.js"]:::sp
-    RT["agent-runtime.js"]:::sp
-    EX["executor.js"]:::sp
-    TH["turn-handler.js"]:::sp
-    RC["recovery-*.js"]:::sp
-    MEM["memory.js"]:::sp
-    TO["click · type · scroll · navigate · wait · extract_text · paste · tab · read_captcha"]:::sp
-    BR["bridge.js"]:::sp
-  end
-
-  subgraph CS["content · 注入页面"]
-    M["main.js"]:::cs
-    S["snapshot.js"]:::cs
-    L["locator.js"]:::cs
-    CE["executor.js"]:::cs
-  end
-
-  subgraph CO["llm · common"]
-    LLM["LLM 适配层"]:::co
-    V["vision.js"]:::co
-    PR["protocol · storage · logger"]:::co
-  end
-
-  User --> UI
-  UI --> PL --> RT --> EX
-  EX --> TH
-  TH --> LLM
-  LLM --> TH
-  EX --> RC
-  EX --> MEM
-  EX --> TO
-  EX --> BR
-  BR <--> PR
-  PR <--> M
-  M --> CE
-  M --> S
-  S --> M
-  M --> L
-  L --> CE
-  V --> LLM
-
-  classDef user fill:#f5c2e7,stroke:#f5c2e7,color:#11111b,font-weight:bold
-  classDef sp fill:#1e1e2e,stroke:#cba6f7,color:#cdd6f4
-  classDef cs fill:#181825,stroke:#b4befe,color:#cdd6f4
-  classDef co fill:#181825,stroke:#f9e2af,color:#cdd6f4
-```
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mldlbs/mio-browser-agent/main/diagrams/mio-arch.svg" alt="mio 架构图" width="100%" />
+</p>
 
 数据流：`planner.js` 规划 → `agent-runtime.js` 调度 `executor.js` 逐步骤执行 → `bridge.js` 通知 `content/main.js` 在页面内动作 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
 
