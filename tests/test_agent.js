@@ -133,6 +133,32 @@ function assertEq(got, want, name) {
   };
   assertEq(snapshotMod.computeAccessibleName(svgIconBtn), "发送", "icon button named from svg title");
 
+  // ── captcha images (verification codes) get a usable name ──
+  const captchaImg = {
+    tagName: "IMG",
+    getAttribute: (a) => (a === "class" ? "captcha-img" : a === "alt" ? null : null),
+    querySelector: () => null,
+    innerText: "",
+    textContent: "",
+  };
+  assert(snapshotMod.computeAccessibleName(captchaImg).includes("验证码"), "captcha img named from class hint");
+  const captchaCanvas = {
+    tagName: "CANVAS",
+    getAttribute: (a) => (a === "class" ? "verify-code" : null),
+    querySelector: () => null,
+    innerText: "",
+    textContent: "",
+  };
+  assert(snapshotMod.computeAccessibleName(captchaCanvas).includes("验证码"), "captcha canvas named from class hint");
+  const plainImg = {
+    tagName: "IMG",
+    getAttribute: () => null,
+    querySelector: () => null,
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.computeAccessibleName(plainImg), "图片", "plain img falls back to 图片");
+
   // ── annotatePositions: icon buttons near a textbox get a position hint ──
   const posElems = [
     { index: 0, role: "textbox", name: "输入框(占位: 给 DeepSeek 发送消息 )", boundingBox: { x: 0, y: 100, w: 300, h: 40 } },

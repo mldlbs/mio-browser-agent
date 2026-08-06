@@ -1,7 +1,7 @@
 // Accessibility snapshot extractor. Pure DOM; no chrome APIs.
 const INTERACTIVE_SELECTOR = [
   "a[href]", "button", "summary", "input", "textarea", "select",
-  "[role]", "[tabindex]", "[contenteditable]", "[onclick]", "canvas",
+  "[role]", "[tabindex]", "[contenteditable]", "[onclick]", "canvas", "img",
 ].join(",");
 
 function truncate(str, max) {
@@ -64,12 +64,6 @@ function computeAccessibleName(el) {
   const aria = el.getAttribute("aria-label");
   if (aria) return truncate(aria, 100);
   const tag = el.tagName.toLowerCase();
-  // Canvas captchas (login verification codes) have no text/role; surface the
-  // class as a hint so the agent can tell them apart from plain canvases.
-  if (tag === "canvas") {
-    const cls = el.getAttribute("class") || "";
-    return truncate(cls ? "画布(" + cls + ")" : "画布", 100);
-  }
   if (tag === "input" || tag === "textarea" || tag === "select") {
     const lbl = associatedLabel(el);
     if (lbl) return truncate(lbl, 100);
@@ -83,6 +77,17 @@ function computeAccessibleName(el) {
   if (alt) return truncate(alt, 100);
   const title = el.getAttribute("title");
   if (title) return truncate(title, 100);
+  // Captcha images (verification codes) are usually a plain <img>/<canvas> with
+  // no text/alt/title; surface a class hint so the agent can pick the right one
+  // out of the page's decorative images.
+  if (tag === "img" || tag === "canvas") {
+    const cls = el.getAttribute("class") || "";
+    if (cls) {
+      const hint = (String(cls).toLowerCase().match(/[\w-]*(?:captcha|verify|验证码|code|rand|randcode)[\w-]*/) || [])[0];
+      if (hint) return truncate("验证码(" + hint.replace(/[_-]+/g, " ") + ")", 100);
+    }
+    return tag === "canvas" ? "画布" : "图片";
+  }
   // Icon-only buttons and clickable boxes need a usable name; a bare "div" is
   // impossible for the agent to tell apart from other divs (→ misclicks/double-sends).
   if (tag === "button" || tag === "summary" || isClickableBox(el)) {
