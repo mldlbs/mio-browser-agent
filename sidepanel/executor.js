@@ -79,6 +79,7 @@ async function executeStep(step, ctx) {
   if (ctx._lastClick === undefined) ctx._lastClick = null;
   if (ctx._actionsSinceLastClick === undefined) ctx._actionsSinceLastClick = 0;
   ctx.silentDoneRounds = 0;
+  ctx._riskRounds = 0;
   
   // Turn-based execution
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -94,8 +95,24 @@ async function executeStep(step, ctx) {
     ctx.lastSnapshot = snapshot;
     const risk = detectPageRisk(snapshot);
     if (risk) {
-      onLog("warn", `检测到页面风险 (${risk.reason})：停止当前步骤，避免触发风控。${risk.url}`);
-      return { ok: false, error: risk.reason, errorCode: "PAGE_RISK_STOP", risk: risk.reason };
+      // Don't hard-fail immediately: the agent may be on a leftover risky tab
+      // (e.g. a moderator-only /mod/ page) that it can navigate away from.
+      // Inject a hint so the LLM can switch tabs / navigate to a clean page.
+      // Only give up after 3 consecutive rounds still on a risky page.
+      ctx._riskRounds = (ctx._riskRounds || 0) + 1;
+      if (ctx._riskRounds >= 3) {
+        onLog("warn", `连续 ${ctx._riskRounds} 轮仍在风险页 (${risk.reason})：停止当前步骤。${risk.url}`);
+        return { ok: false, error: risk.reason, errorCode: "PAGE_RISK_STOP", risk: risk.reason };
+      }
+      onLog("warn", `检测到页面风险 (${risk.reason})：提示 agent 离开当前页面。${risk.url}`);
+      ctx.history.push({
+        role: "user",
+        content: `[系统] 当前页面检测到风险（${risk.reason}，URL: ${risk.url || "未知"}）。` +
+          `请勿在此页面执行任何点击/输入。用 tab 工具切换到其他标签页，` +
+          `或新建标签页导航到目标页面后再继续当前步骤。`,
+      });
+    } else {
+      ctx._riskRounds = 0;
     }
     const diff = ctx.memory.remember(snapshot);
     ctx.history.push({ 

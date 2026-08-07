@@ -1395,9 +1395,12 @@ function assertEq(got, want, name) {
   assert(riskDetect({ url: "https://www.reddit.com/r/chrome_extensions/about/rules/", title: "rules" }) == null, "public about/rules page not flagged");
   assert(riskDetect(null) == null, "null snapshot not flagged");
 
-  // PAGE_RISK_STOP short-circuits a step instead of acting.
+  // PAGE_RISK_STOP: 3 consecutive rounds on a risky page stop the step.
   const riskLlm = mockLlm([
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("navigate", { url: "https://example.com/" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("navigate", { url: "https://example.com/" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("navigate", { url: "https://example.com/" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("navigate", { url: "https://example.com/" })] }),
   ]);
   const riskRes = await executorMod.executeStep(
     { description: "t" },
@@ -1406,11 +1409,36 @@ function assertEq(got, want, name) {
       bridge: { snapshot: async () => ({ url: "https://www.google.com/recaptcha/api2/anchor", title: "Human Verification", elements: [] }), executeAction: async () => ({ ok: true }) },
       memory: memoryMod.createMemory(),
       getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
-      onLog: () => {}, isStopped: () => false, maxTurns: 3, maxRecoveryAttempts: 2,
+      onLog: () => {}, isStopped: () => false, maxTurns: 6, maxRecoveryAttempts: 2,
       history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "t" }] }, goal: "g",
     }
   );
-  assert(!riskRes.ok && riskRes.errorCode === "PAGE_RISK_STOP", "captcha page stops the step with PAGE_RISK_STOP");
+  assert(!riskRes.ok && riskRes.errorCode === "PAGE_RISK_STOP", "3 rounds on captcha page stops the step with PAGE_RISK_STOP");
+
+  // A risky leftover tab (e.g. /mod/ page) is escapable: agent navigates to a
+  // clean page and the step proceeds instead of hard-failing immediately.
+  let riskyFirst = true;
+  const escapeBridge = {
+    snapshot: async () => {
+      if (riskyFirst) return { url: "https://www.reddit.com/mod/chrome_extensions/rules/", title: "Mod tools", elements: [] };
+      return { url: "https://www.reddit.com/r/AI_Agents/", title: "AI Agents", elements: [{ index: 0, role: "button", name: "x" }] };
+    },
+    executeAction: async (a) => { if (a.name === "navigate" || a.name === "tab") riskyFirst = false; return { ok: true, value: "did " + a.name }; },
+  };
+  const escapeLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("navigate", { url: "https://www.reddit.com/r/AI_Agents/" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }),
+  ]);
+  const escapeRes = await executorMod.executeStep(
+    { description: "t" },
+    {
+      llm: escapeLlm, bridge: escapeBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 5, maxRecoveryAttempts: 2,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "t" }] }, goal: "g",
+    }
+  );
+  assert(escapeRes.ok, "agent escapes a risky tab by navigating and the step completes");
 
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
