@@ -80,6 +80,9 @@ async function executeStep(step, ctx) {
   if (ctx._actionsSinceLastClick === undefined) ctx._actionsSinceLastClick = 0;
   ctx.silentDoneRounds = 0;
   ctx._riskRounds = 0;
+  ctx._stepActions = 0;
+  ctx._stepStartSnapshot = null;
+  ctx._stepFinishWarned = undefined;
   
   // Turn-based execution
   for (let turn = 0; turn < maxTurns; turn++) {
@@ -93,6 +96,7 @@ async function executeStep(step, ctx) {
     // Get fresh snapshot
     const snapshot = await safeSnapshot(bridge);
     ctx.lastSnapshot = snapshot;
+    if (!ctx._stepStartSnapshot) ctx._stepStartSnapshot = snapshot;
     const risk = detectPageRisk(snapshot);
     if (risk) {
       // Don't hard-fail immediately: the agent may be on a leftover risky tab
@@ -184,6 +188,21 @@ async function executeStep(step, ctx) {
       
       if (tc.name === "finish") {
         const summary = tc.args.summary || "";
+        // Guard against "said done but did nothing": if this step clearly
+        // needed an action and none was performed (and the page did not change),
+        // reject the finish once and ask the agent to actually act.
+        const outcome = (ctx.verifyStepOutcome && (await _verifyStepOutcome(ctx, step))) || { ok: true, reason: "" };
+        if (!outcome.ok && ctx._stepFinishWarned === undefined) {
+          ctx._stepFinishWarned = true;
+          ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: outcome.reason, errorCode: "STEP_NOT_VERIFIED" }) });
+          ctx.history.push({
+            role: "user",
+            content: `[系统] 本步骤 "${step.description}" 需要实际动作，但你没有执行任何操作且页面没有变化（${outcome.reason}）。` +
+              `请真正执行该步骤所需的工具（输入/点击/提交/提取等），完成后再调用 finish。`,
+          });
+          onLog("recovery", `STEP_NOT_VERIFIED 注入纠正: ${outcome.reason}`);
+          continue;
+        }
         onLog("finish", summary.slice(0, 300));
         // Complete remaining tool calls
         for (let j = i; j < toolCalls.length; j++) {
@@ -261,6 +280,11 @@ async function executeStep(step, ctx) {
       }
 
       if (result.ok) {
+        // Count state-changing actions so a bare finish on a step that needed
+        // work can be detected (see _verifyStepOutcome).
+        if (tc.name === "click" || isStateChangingTool(tc.name)) {
+          ctx._stepActions++;
+        }
         // Track the last successful click target so a duplicate click in the next
         // round is short-circuited (prevents double-submitting on chat pages).
         if (tc.name === "click" && result.ok) {
@@ -480,6 +504,28 @@ function detectPageRisk(snapshot) {
     return { reason: "访问了版主工具页 /mod/（普通用户不可达，易触发验证码）", url: url || title };
   }
   return null;
+}
+
+// A step that claimed to be done without performing any state-changing action
+// AND without any observable page change is suspicious ("said done, did
+// nothing"). Returns { ok, reason }. Steps that executed an action, or whose
+// page changed (navigation / new content / URL), pass.
+async function _verifyStepOutcome(ctx, step) {
+  try {
+    if ((ctx._stepActions || 0) > 0) return { ok: true, reason: "" };
+    const start = ctx._stepStartSnapshot;
+    const after = ctx.lastSnapshot || {};
+    if (!start) return { ok: true, reason: "" };
+    const startUrl = (start.url || "").replace(/#.*$/, "");
+    const afterUrl = (after.url || "").replace(/#.*$/, "");
+    if (startUrl && afterUrl && startUrl !== afterUrl) return { ok: true, reason: "" };
+    const startCount = (start.elements || []).length;
+    const afterCount = (after.elements || []).length;
+    if (Math.abs(afterCount - startCount) >= 3) return { ok: true, reason: "" };
+    return { ok: false, reason: "未执行任何操作且页面没有变化（无导航/无新增元素）" };
+  } catch (_) {
+    return { ok: true, reason: "" };
+  }
 }
 
 // Verify that a send click actually worked. Returns { ok, how, reason }.

@@ -581,6 +581,47 @@ function assertEq(got, want, name) {
   );
   assert(!res3.ok && res3.error.includes("stopped"), "executor aborts on stop signal");
 
+  // ── step-outcome verification: a bare finish with no action and no page
+  //    change is rejected once, then the agent must actually act ──
+  let svClicks = 0;
+  const svBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "go" }] }),
+    executeAction: async () => { svClicks++; return { ok: true, value: "did" }; },
+  };
+  const svLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done nothing" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "actually did it" })] }),
+  ]);
+  const svRes = await executorMod.executeStep(
+    { description: "点击按钮" },
+    {
+      llm: svLlm, bridge: svBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 5, maxRecoveryAttempts: 2,
+      verifyStepOutcome: true,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "点击按钮" }] }, goal: "g",
+    }
+  );
+  assert(svRes.ok && svRes.summary === "actually did it", "step-outcome verification lets the corrected step finish");
+  assert(svClicks === 1, "step-outcome verification forced a real action (click executed)");
+
+  // Verification off (default): bare finish passes without any action.
+  const noVerifyBridge = { snapshot: async () => ({ url: "u", title: "t", elements: [] }), executeAction: async () => ({ ok: true }) };
+  const noVerifyLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const noVerifyRes = await executorMod.executeStep(
+    { description: "t" },
+    {
+      llm: noVerifyLlm, bridge: noVerifyBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 3, maxRecoveryAttempts: 2,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "t" }] }, goal: "g",
+    }
+  );
+  assert(noVerifyRes.ok && noVerifyRes.summary === "ok", "bare finish passes when verification is off");
+
   // ── history consistency: every tool_call_id has a matching tool message ──
   const histLlm = mockLlm([
     () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 }), makeToolCall("type", { index: 0, text: "x" })] }),
