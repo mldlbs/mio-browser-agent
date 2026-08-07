@@ -2,8 +2,8 @@
 function setNativeValue(el, value) {
   let proto;
   if (el.tagName === "TEXTAREA") proto = HTMLTextAreaElement.prototype;
-  else if (el.tagName === "SELECT") proto = HTMLSelectElement.prototype;
-  else proto = HTMLInputElement.prototype;
+  else if (el.tagName === "INPUT") proto = HTMLInputElement.prototype;
+  else return { ok: false, error: `cannot set value on <${el.tagName.toLowerCase()}> (not an input/textarea)` };
   const setter = Object.getOwnPropertyDescriptor(proto, "value");
   if (!setter || !setter.set) return { ok: false, error: `cannot set value on <${el.tagName.toLowerCase()}>` };
   setter.set.call(el, value);
@@ -99,6 +99,9 @@ function executeAction(action) {
     return { ok: true, value: `clicked ${target.name}` };
   }
   if (name === "type") {
+    const editable = resolveEditable(el);
+    if (!editable) return { ok: false, error: `no editable element near <${el.tagName.toLowerCase()}>` };
+    el = editable;
     el.focus();
     if (el.isContentEditable) {
       setContentEditable(el, args.text, !!args.clear);
@@ -194,8 +197,46 @@ function extractPageText(maxChars) {
   return { ok: true, value: { url: location.href, title: document.title, text } };
 }
 
+// Some rich editors overlay toolbar buttons on/near the input region; a
+// rect-based locator can resolve to the button instead of the editor field.
+// Walk up from the located element, then fall back to the nearest editable
+// element in the same container so paste/type still land in the editor.
+function resolveEditable(el) {
+  if (!el) return null;
+  if (el.isContentEditable || el.tagName === "TEXTAREA" || el.tagName === "INPUT") {
+    return el;
+  }
+  let node = el;
+  while (node && node !== document.body) {
+    if (node.isContentEditable) return node;
+    node = node.parentElement;
+  }
+  if (!el.closest) return null;
+  const root = el.closest("[role='textbox'],[contenteditable='true'],form,.editor,.ProseMirror") || document.body;
+  const editable = Array.from(root.querySelectorAll("textarea,input,[contenteditable='true'],[role='textbox']"))
+    .filter((cand) => cand.offsetParent !== null || cand.getClientRects().length > 0);
+  if (!editable.length) return null;
+  const elRect = el.getBoundingClientRect();
+  let best = null;
+  let bestDist = Infinity;
+  editable.forEach((cand) => {
+    const r = cand.getBoundingClientRect();
+    const cx = r.x + r.width / 2;
+    const cy = r.y + r.height / 2;
+    const d = Math.hypot(cx - (elRect.x + elRect.width / 2), cy - (elRect.y + elRect.height / 2));
+    if (d < bestDist) { bestDist = d; best = cand; }
+  });
+  // Only adopt the nearest editable if it is plausibly the intended field;
+  // otherwise report failure so the recovery engine retries with a fresh
+  // snapshot instead of typing into some unrelated input far away.
+  return bestDist < 300 ? best : null;
+}
+
 // Paste large text into an element (contenteditable or textarea/input).
 function pasteText(el, text, clear) {
+  const target = resolveEditable(el);
+  if (!target) return { ok: false, error: `no editable element near <${el.tagName.toLowerCase()}>` };
+  el = target;
   const wrapped = Array.isArray(text) ? text.join("\n") : String(text);
   el.focus();
   if (el.isContentEditable) {
@@ -263,5 +304,5 @@ function waitForCondition(args) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { executeAction, setNativeValue, setContentEditable, extractPageText, pasteText, waitForCondition };
+  module.exports = { executeAction, setNativeValue, setContentEditable, resolveEditable, extractPageText, pasteText, waitForCondition };
 }
