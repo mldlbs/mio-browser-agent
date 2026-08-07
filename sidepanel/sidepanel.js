@@ -4,6 +4,7 @@ let runtime = null;
 let currentTask = null;
 let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
+let _historyPage = 0;
 
 function resetPlanProgress() {
   planProgress = { steps: [], done: [], failed: [], replanned: false };
@@ -142,7 +143,9 @@ async function init() {
   $("historyClose").addEventListener("click", toggleHistory);
   $("historyClear").addEventListener("click", clearHistory);
   $("historyExport").addEventListener("click", exportHistory);
-  $("historySearch").addEventListener("input", renderHistory);
+  $("historySearch").addEventListener("input", () => { _historyPage = 0; renderHistory(); });
+  $("historyPrev").addEventListener("click", () => { if (_historyPage > 0) { _historyPage--; renderHistory(); } });
+  $("historyNext").addEventListener("click", () => { _historyPage++; renderHistory(); });
   $("collapsePanel").addEventListener("click", async () => {
     if (currentTask) await runtime && runtime.stop();
     try {
@@ -176,6 +179,7 @@ function toggleHistory() {
 }
 
 async function clearHistory() {
+  _historyPage = 0;
   await HistoryModule.clearHistory();
   renderHistory();
   appendLog("ui", "历史记录已清空");
@@ -214,9 +218,15 @@ function renderHistory() {
       empty.className = "history-empty";
       empty.textContent = q ? "没有匹配的记录" : "暂无历史记录";
       list.appendChild(empty);
+      updateHistoryPager(0, 1);
       return;
     }
-    for (const r of filtered) {
+    const perPage = 10;
+    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+    if (_historyPage >= totalPages) _historyPage = totalPages - 1;
+    if (_historyPage < 0) _historyPage = 0;
+    const pageRecords = filtered.slice(_historyPage * perPage, (_historyPage + 1) * perPage);
+    for (const r of pageRecords) {
       const item = document.createElement("div");
       item.className = "history-item s-" + r.status + (r.pinned ? " pinned" : "");
       const head = document.createElement("div");
@@ -325,7 +335,17 @@ function renderHistory() {
       }
       list.appendChild(item);
     }
+    updateHistoryPager(filtered.length, totalPages);
   });
+}
+
+function updateHistoryPager(total, totalPages) {
+  const pager = $("historyPager");
+  if (!pager) return;
+  pager.hidden = total <= 10;
+  $("historyPrev").disabled = _historyPage <= 0;
+  $("historyNext").disabled = _historyPage >= totalPages - 1;
+  $("historyPageInfo").textContent = (_historyPage + 1) + " / " + totalPages + "（共 " + total + " 条）";
 }
 
 async function startTask(resume) {

@@ -386,6 +386,26 @@
       scrollbar-color: var(--surface) transparent;
     }
     .history-empty { color: var(--overlay); text-align: center; padding: 20px 0; font-size: 12px; }
+    .history-pager {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-top: 1px solid var(--surface);
+    }
+    .history-pager button {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--overlay);
+      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .history-pager button:disabled { opacity: 0.35; cursor: default; }
+    .history-pager span { font-size: 11px; color: var(--overlay); min-width: 40px; text-align: center; }
     .history-item {
       background: var(--crust);
       border: 1px solid var(--surface);
@@ -580,6 +600,11 @@
       </div>
       <input id="historySearch" class="history-search" type="text" placeholder="搜索目标 / 摘要 / 标签…">
       <div class="history-list" id="historyList"></div>
+      <div class="history-pager" id="historyPager" hidden>
+        <button id="historyPrev" title="上一页">‹</button>
+        <span id="historyPageInfo">1 / 1</span>
+        <button id="historyNext" title="下一页">›</button>
+      </div>
     </div>
 
     <div class="plan-panel" id="planPanel" hidden></div>
