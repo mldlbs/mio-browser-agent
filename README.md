@@ -1,11 +1,37 @@
 # mio 🐾
 
-一个自然语言驱动的浏览器 Agent（Chrome 扩展）。告诉它你想做什么，mio 会像幽灵一样在网页上替你点击、输入、滚动、导航、提取内容。
+一个自然语言驱动的浏览器 Agent（Chrome 扩展）。告诉它你想做什么，mio 会像幽灵一样在网页上替你点击、输入、滚动、导航、提取内容——就像给浏览器雇了个会自己干活的助手。
+
+**零依赖 · 本地运行 · 免费开源** —— 不需要 Node、Python 或任何环境，一个 Chrome 扩展搞定；LLM 用你自己的 API Key（甚至可以接本地模型），网页数据不出你的电脑。
+
+## 🚀 2 分钟开始
+
+1. 下载 [release 里的 zip](https://github.com/mldlbs/mio-browser-agent/releases) 并解压，或 `git clone` 本仓库
+2. 打开 `chrome://extensions`，右上角开启「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择含 `manifest.json` 的目录
+4. 点工具栏的 mio 图标打开侧边面板，在「设置」填好你的 LLM（见下）
+5. 输入目标，例如 `在搜索框输入 hello 并点击提交按钮`，点「开始任务」
+
+> 嫌麻烦？直接下载 release 里的 `.crx` 签名包，双击即可安装（Chrome 会提示「未列入商店」，属正常，自签名扩展均如此）。
+
+### 配置模型
+
+在侧边面板「设置」中填写：
+
+| 字段 | 说明 | 示例 |
+| --- | --- | --- |
+| Provider | 供应商标识 | `openai` |
+| Model | 模型名 | `gpt-4o-mini` |
+| Base URL | API 地址 | `https://api.openai.com/v1` |
+| API Key | 密钥（明文存储于 `chrome.storage.local`，仅本机可见） | — |
+| Max Steps | 单次任务最大步数 | `30` |
+
+**数据不出门**：mio 只把你的 Key 存在本机 `chrome.storage`，网页内容直接发到你填写的 Base URL。想完全本地？把 Base URL 指向本地服务即可（如 `http://localhost:11434/v1` 接 Ollama，或任意 OpenAI 兼容的本地推理服务），无需任何改动。
 
 ## ✨ 特性
 
 - **自然语言任务**：输入目标，mio 自动规划步骤并执行，例如「在搜索框输入 hello 并点击提交按钮」
-- **内置工具集**：`click`、`type`、`scroll`、`navigate`、`wait`、`extract_text`、`paste`、`tab`
+- **内置工具集**：`click`、`type`、`scroll`、`navigate`、`wait`、`extract_text`、`paste`、`tab`、`read_captcha`
 - **恢复引擎（Recovery Engine）**：动作失败时自动定位替代元素、回退重试、重新规划，而不是死磕到超时
 - **自愈式执行**：同一网页访问 LLM 可以记忆和复用（memory），跨页面保持上下文（runtime protocol / turn handler）
 - **幽灵主题 UI**：深靛底 + 雾紫配色的侧边面板，日志按类型着色，状态一目了然
@@ -19,26 +45,7 @@
 
 数据流：`planner.js` 规划 → `agent-runtime.js` 调度 `executor.js` 逐步骤执行 → `bridge.js` 通知 `content/main.js` 在页面内动作 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
 
-## 🚀 安装
-
-1. 克隆仓库后，打开 `chrome://extensions`
-2. 右上角开启「开发者模式」
-3. 点击「加载已解压的扩展程序」，选择本仓库目录（含 `manifest.json` 的那层）
-4. 点开侧边面板即可使用（工具栏图标 → 「mio」）
-
 ## 📖 使用
-
-### 配置模型
-
-在侧边面板「设置」中填写：
-
-| 字段 | 说明 | 示例 |
-| --- | --- | --- |
-| Provider | 供应商标识 | `openai` |
-| Model | 模型名 | `gpt-4o-mini` |
-| Base URL | API 地址 | `https://api.openai.com/v1` |
-| API Key | 密钥（明文存储于 `chrome.storage.local`，仅本机可见） | — |
-| Max Steps | 单次任务最大步数 | `30` |
 
 ### 运行任务
 
