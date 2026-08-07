@@ -25,18 +25,18 @@ const { openTab, runInPage, report } = require("./page-runner");
       const el = locateElement(btn);
       check(!!el && el.id === "btn-login", "locator round-trips snapshot element", el && el.id);
 
-      const typeRes = executeAction({ name: "type", target: inp, args: { text: "hello", clear: true } });
+      const typeRes = await executeAction({ name: "type", target: inp, args: { text: "hello", clear: true } });
       check(typeRes.ok && document.getElementById("input-search").value === "hello", "executor types into input");
 
       window.__clicked = 0;
-      const clickRes = executeAction({ name: "click", target: btn, args: {} });
+      const clickRes = await executeAction({ name: "click", target: btn, args: {} });
       check(clickRes.ok && window.__clicked === 1, "executor clicks button");
 
-      const edRes = executeAction({ name: "type", target: ed, args: { text: "x", clear: true } });
+      const edRes = await executeAction({ name: "type", target: ed, args: { text: "x", clear: true } });
       check(edRes.ok && document.getElementById("box-editor").textContent === "x", "executor types into contenteditable");
 
       // contenteditable append behavior（clear:false）——追加到现有 textContent
-      const edAppend = executeAction({ name: "type", target: ed, args: { text: "abc", clear: false } });
+      const edAppend = await executeAction({ name: "type", target: ed, args: { text: "abc", clear: false } });
       check(edAppend.ok && document.getElementById("box-editor").textContent === "xabc", "executor appends to contenteditable");
 
       // Shadow DOM：open shadow root 内元素可快照 + 定位 + 点击
@@ -47,7 +47,7 @@ const { openTab, runInPage, report } = require("./page-runner");
       const sLoc = locateElement(sbtn);
       check(!!sLoc && sLoc.id === "shadow-btn", "locator round-trips shadow element via cssPath", sLoc && sLoc.id);
       window.__shadowClicks = 0;
-      const sClick = executeAction({ name: "click", target: sbtn, args: {} });
+      const sClick = await executeAction({ name: "click", target: sbtn, args: {} });
       check(sClick.ok && window.__shadowClicks === 1, "executor clicks button inside shadow root", sClick.ok);
 
       // Canvas captcha：快照收录 + 可定位 + 可点击（登录验证码场景）
@@ -56,7 +56,7 @@ const { openTab, runInPage, report } = require("./page-runner");
       const capEl = locateElement(cap);
       check(!!capEl && capEl.id === "captcha-canvas", "locator round-trips canvas element", capEl && capEl.id);
       window.__captchaClicks = 0;
-      const capClick = executeAction({ name: "click", target: cap, args: {} });
+      const capClick = await executeAction({ name: "click", target: cap, args: {} });
       check(capClick.ok && window.__captchaClicks === 1, "executor clicks canvas captcha", capClick.ok);
 
       // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）

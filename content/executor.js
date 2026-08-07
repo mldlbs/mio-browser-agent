@@ -12,13 +12,40 @@ function setNativeValue(el, value) {
   return { ok: true };
 }
 
+const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// Insert text in small chunks with a random per-chunk delay, mimicking a human
+// typist. Bulk execCommand inserts are a common automation fingerprint and get
+// flagged by bot detection (e.g. Reddit). Chunking + jitter keeps the native
+// beforeinput/input pipeline that ProseMirror/React editors sync from, while
+// looking natural in event timing.
+async function typeIntoEditor(el, text) {
+  el.focus();
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  const chars = String(text).split("");
+  let i = 0;
+  while (i < chars.length) {
+    // 1-4 chars per burst, 30-90ms pause between bursts.
+    const burst = Math.min(chars.length - i, rand(1, 4));
+    document.execCommand("insertText", false, chars.slice(i, i + burst).join(""));
+    i += burst;
+    await sleepMs(rand(30, 90));
+  }
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
 // Set contenteditable text the way real browsers do: focus + place caret +
 // execCommand("insertText"). This fires the native beforeinput/input pipeline
 // that ProseMirror/React rich editors sync their INTERNAL state from. Plain
 // textContent writes leave that state stale, which keeps send/submit buttons
 // disabled and makes el.click() a silent no-op (the root cause of "typed but
 // message never sent" on chat sites).
-function setContentEditable(el, text, clear) {
+async function setContentEditable(el, text, clear) {
   try {
     el.focus();
     const sel = window.getSelection();
@@ -28,17 +55,8 @@ function setContentEditable(el, text, clear) {
     sel.addRange(range);
     if (clear) {
       document.execCommand("delete");
-      document.execCommand("insertText", false, String(text));
-    } else {
-      // Caret to end, then insert so the editor appends like a user typing.
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      document.execCommand("insertText", false, String(text));
     }
-    // execCommand already fires input; dispatch one more for editors that only
-    // listen to the plain input event.
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+    await typeIntoEditor(el, text);
     return { ok: true };
   } catch (_) {
     // Fallback: textContent write + manual InputEvent (older editors).
@@ -70,7 +88,7 @@ function doClick(el, clickCount) {
   return { ok: true, value: `clicked ${el.tagName.toLowerCase()}` };
 }
 
-function executeAction(action) {
+async function executeAction(action) {
   const { name, target, args } = action;
   if (name === "scroll") {
     window.scrollBy({ top: args.delta, behavior: "auto" });
@@ -86,12 +104,12 @@ function executeAction(action) {
   if (name === "paste") {
     const el = locateElement(target);
     if (!el) return { ok: false, error: "element not found by locator" };
-    return pasteText(el, args.text || "", args.clear);
+    return await pasteText(el, args.text || "", args.clear);
   }
   if (name === "waitFor") {
     return waitForCondition(args || {});
   }
-  const el = locateElement(target);
+  let el = locateElement(target);
   if (!el) return { ok: false, error: "element not found by locator" };
   if (name === "click") {
     const res = doClick(el, args.clickCount || 1);
@@ -104,7 +122,7 @@ function executeAction(action) {
     el = editable;
     el.focus();
     if (el.isContentEditable) {
-      setContentEditable(el, args.text, !!args.clear);
+      await setContentEditable(el, args.text, !!args.clear);
     } else {
       if (args.clear) {
         const cleared = setNativeValue(el, "");
@@ -233,14 +251,14 @@ function resolveEditable(el) {
 }
 
 // Paste large text into an element (contenteditable or textarea/input).
-function pasteText(el, text, clear) {
+async function pasteText(el, text, clear) {
   const target = resolveEditable(el);
   if (!target) return { ok: false, error: `no editable element near <${el.tagName.toLowerCase()}>` };
   el = target;
   const wrapped = Array.isArray(text) ? text.join("\n") : String(text);
   el.focus();
   if (el.isContentEditable) {
-    setContentEditable(el, wrapped, !!clear);
+    await setContentEditable(el, wrapped, !!clear);
     el.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true, value: `pasted ${wrapped.length} chars` };
   } else if (el.tagName === "TEXTAREA" || el.tagName === "INPUT") {

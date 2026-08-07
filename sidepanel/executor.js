@@ -91,6 +91,11 @@ async function executeStep(step, ctx) {
     // Get fresh snapshot
     const snapshot = await safeSnapshot(bridge);
     ctx.lastSnapshot = snapshot;
+    const risk = detectPageRisk(snapshot);
+    if (risk) {
+      onLog("warn", `检测到页面风险 (${risk.reason})：停止当前步骤，避免触发风控。${risk.url}`);
+      return { ok: false, error: risk.reason, errorCode: "PAGE_RISK_STOP", risk: risk.reason };
+    }
     const diff = ctx.memory.remember(snapshot);
     ctx.history.push({ 
       role: "user", 
@@ -198,6 +203,13 @@ async function executeStep(step, ctx) {
       ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
       const shown = result.value == null ? "ok" : (typeof result.value === "string" ? result.value.slice(0, 120) : JSON.stringify(result.value).slice(0, 120));
       onLog("tool", `${tc.name} → ${result.ok ? shown : "ERR " + result.error}`);
+
+      // Human-paced pacing: state-changing actions get a random 300-900ms pause
+      // before the next turn so the page settles and the timing looks natural
+      // (less likely to trip bot detection on sites like Reddit).
+      if (result.ok && isStateChangingTool(tc.name)) {
+        await sleep(rand(300, 900));
+      }
       
       // ── Send verification loop ──
       // A send click can silently no-op (disabled send button / editor-state
@@ -421,6 +433,32 @@ function isStateChangingTool(name) {
   return name === "type" || name === "paste" || name === "navigate" || name === "tab" || name === "scroll";
 }
 
+// Heuristic page-risk detection. When a target site shows a captcha challenge,
+// a "removed/deleted" notice, or a rate-limit wall, continuing to act is both
+// pointless and likely to worsen account/IP standing. Fail the step loudly
+// instead of letting the agent spin through retries.
+function detectPageRisk(snapshot) {
+  if (!snapshot) return null;
+  const url = snapshot.url || "";
+  const title = snapshot.title || "";
+  const text = [url, title].join(" ").toLowerCase();
+  const riskyUrl = /recaptcha|hcaptcha|captcha|verify|challenge/.test(url);
+  const captchaTitle = /captcha|验证码|human verification|verify you are human|are you a robot|确认你是真人|人机验证/i.test(title);
+  if (riskyUrl || captchaTitle) {
+    return { reason: "页面出现验证码/人机验证（captcha）", url: url || title };
+  }
+  const removedTitle = /this post was removed|this content was removed|post removed|帖子已被删除|已被删除|removed by moderator|unavailable/i.test(title);
+  const removedUrl = /removed|deleted/.test(url) && /reddit|\.com/.test(url);
+  if (removedTitle || removedUrl) {
+    return { reason: "页面内容已被删除/不可用，继续操作无意义", url: url || title };
+  }
+  const rateLimit = /rate limit|slow down|try again later|too many requests|429/i.test(title);
+  if (rateLimit) {
+    return { reason: "触发了频率限制（rate limit）", url: url || title };
+  }
+  return null;
+}
+
 // Verify that a send click actually worked. Returns { ok, how, reason }.
 // 1) DOM signals: the typed textbox got cleared, url changed, or new elements
 //    appeared. 2) If ambiguous, ask the vision model (runSendConfirm) whether
@@ -495,6 +533,8 @@ async function safeSnapshot(bridge) {
 }
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 function trimHistory(history, maxLen) {
   if (history.length <= maxLen) return;
@@ -600,7 +640,7 @@ async function execute(plan, ctx) {
   return { ok: true, summary: lastSummary || "所有步骤完成" };
 }
 
-const executor = { execute, executeStep, buildSystemPrompt, trimHistory, changeNote };
+const executor = { execute, executeStep, buildSystemPrompt, trimHistory, changeNote, detectPageRisk, isStateChangingTool };
 if (typeof module !== "undefined") {
   module.exports = executor;
 } else {

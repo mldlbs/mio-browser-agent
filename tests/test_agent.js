@@ -195,9 +195,9 @@ function assertEq(got, want, name) {
     focus: () => {},
     dispatchEvent: () => {},
   };
-  const pe = contentExecMod.pasteText(editable, "正文第一段", false);
+  const pe = await contentExecMod.pasteText(editable, "正文第一段", false);
   assert(pe.ok && editable.textContent === "正文第一段", "pasteText writes into contenteditable");
-  const clearEd = contentExecMod.pasteText(editable, "覆盖", true);
+  const clearEd = await contentExecMod.pasteText(editable, "覆盖", true);
   assert(clearEd.ok && editable.textContent === "覆盖", "pasteText clear replaces contenteditable");
   const area = {
     tagName: "TEXTAREA",
@@ -205,7 +205,7 @@ function assertEq(got, want, name) {
     focus: () => {},
     dispatchEvent: () => {},
   };
-  const pa = contentExecMod.pasteText(area, "段落A\n段落B", false);
+  const pa = await contentExecMod.pasteText(area, "段落A\n段落B", false);
   assert(pa.ok && area.value === "段落A\n段落B", "pasteText writes into textarea with newlines");
 
   // ── resolveFrameDoc: descends same-origin iframes by index ──
@@ -1382,6 +1382,33 @@ function assertEq(got, want, name) {
     llm: { generate: async () => ({ content: "4y97B" }) },
   });
   assert(!captcha5.ok, "5-char captcha read rejected");
+
+  // ── page-risk detection (captcha / removed / rate-limit walls) ──
+  const riskDetect = executorMod.detectPageRisk;
+  assert(riskDetect({ url: "https://www.google.com/recaptcha/api2/anchor", title: "Human Verification" }) != null, "detects recaptcha url");
+  assert(riskDetect({ url: "https://x.com/signup", title: "Verify you are human" }) != null, "detects human-verification title");
+  assert(riskDetect({ url: "https://www.reddit.com/r/x/comments/abc/", title: "This post was removed by moderator" }) != null, "detects removed post");
+  assert(riskDetect({ url: "https://www.reddit.com/r/x/comments/abc/", title: "帖子已被删除" }) != null, "detects removed post (zh)");
+  assert(riskDetect({ url: "https://api.reddit.com/", title: "Too Many Requests - Slow down" }) != null, "detects rate limit");
+  assert(riskDetect({ url: "https://www.reddit.com/r/AI_Agents/", title: "AI Agents" }) == null, "normal page not flagged");
+  assert(riskDetect(null) == null, "null snapshot not flagged");
+
+  // PAGE_RISK_STOP short-circuits a step instead of acting.
+  const riskLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),
+  ]);
+  const riskRes = await executorMod.executeStep(
+    { description: "t" },
+    {
+      llm: riskLlm,
+      bridge: { snapshot: async () => ({ url: "https://www.google.com/recaptcha/api2/anchor", title: "Human Verification", elements: [] }), executeAction: async () => ({ ok: true }) },
+      memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 3, maxRecoveryAttempts: 2,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "t" }] }, goal: "g",
+    }
+  );
+  assert(!riskRes.ok && riskRes.errorCode === "PAGE_RISK_STOP", "captcha page stops the step with PAGE_RISK_STOP");
 
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
