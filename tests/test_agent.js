@@ -1391,6 +1391,8 @@ function assertEq(got, want, name) {
   assert(riskDetect({ url: "https://www.reddit.com/r/x/comments/abc/", title: "帖子已被删除" }) != null, "detects removed post (zh)");
   assert(riskDetect({ url: "https://api.reddit.com/", title: "Too Many Requests - Slow down" }) != null, "detects rate limit");
   assert(riskDetect({ url: "https://www.reddit.com/r/AI_Agents/", title: "AI Agents" }) == null, "normal page not flagged");
+  assert(riskDetect({ url: "https://www.reddit.com/mod/chrome_extensions/rules/", title: "Mod tools" }) != null, "moderator tools page flagged as risky");
+  assert(riskDetect({ url: "https://www.reddit.com/r/chrome_extensions/about/rules/", title: "rules" }) == null, "public about/rules page not flagged");
   assert(riskDetect(null) == null, "null snapshot not flagged");
 
   // PAGE_RISK_STOP short-circuits a step instead of acting.

@@ -51,7 +51,8 @@ Use tools to manipulate the page. Rules:
 - Icon-only buttons (e.g. named "图标按钮(输入框右下)") have no visible label. When you need to submit/send, pick the icon button annotated as beside/below the textbox you just typed into (look for "输入框右下"/"输入框下"/"输入框旁") — the send control sits at the bottom-right of the chat input. Do not click random icon buttons elsewhere on the page.
 - Login forms often include a verification code (验证码/captcha) drawn on a canvas or img element. To read it, call the read_captcha tool — it screenshots the page and has the vision model read the 4 characters; then type the result into the 验证码 input. read_captcha is the ONLY captcha-reading tool and needs no other screenshot tool. If a captcha looks unreadable, click the captcha image first to refresh it, then call read_captcha again. Never declare a captcha unreadable before calling read_captcha at least once.
 - You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
-- After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).`;
+- After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).
+- On Reddit, never navigate to moderator-only /mod/... URLs (e.g. /mod/<sub>/rules) — those are blocked for normal users and trigger captchas. To read a subreddit's rules use the public page: https://www.reddit.com/r/<sub>/about/rules/. Avoid scraping reddit.com site-wide.`;
 
 function buildSystemPrompt(goal, plan, step) {
   return AGENT_PROMPT
@@ -455,6 +456,11 @@ function detectPageRisk(snapshot) {
   const rateLimit = /rate limit|slow down|try again later|too many requests|429/i.test(title);
   if (rateLimit) {
     return { reason: "触发了频率限制（rate limit）", url: url || title };
+  }
+  // Moderator-only tooling (/mod/...) is off-limits for normal automation and
+  // a hotspot for captcha walls (e.g. /mod/<sub>/rules). Treat it as risky.
+  if (/reddit\.com\/mod\//i.test(url)) {
+    return { reason: "访问了版主工具页 /mod/（普通用户不可达，易触发验证码）", url: url || title };
   }
   return null;
 }
