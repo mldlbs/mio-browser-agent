@@ -521,6 +521,54 @@ function assertEq(got, want, name) {
   assert(replanned === 1, "executor replans after repeated failures");
   assert(res2.ok, "executor completes after replan");
 
+  // ── multi-step replan resumes from the failed step, not step 0 ──
+  // stepA completes, stepB keeps failing until replan; replan receives the
+  // completed-step list (done=["A"]) so the planner avoids redoing step A.
+  let replanDoneArg = null;
+  let replanFired = false;
+  const multiBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "go" }] }),
+    executeAction: async (a) => {
+      if (a.name === "click" && a.args && a.args.index === 99) return { ok: false, error: "boom" };
+      return { ok: true, value: "did " + a.name };
+    },
+  };
+  // Stateful mock: before replan, every action is a failing click (so stepB
+  // exhausts its retries); after replan fires, finish succeeds immediately.
+  let multiTurn = 0;
+  let postReplanFinishes = 0;
+  const multiLlm = {
+    generate: async () => {
+      multiTurn++;
+      if (multiTurn <= 2) {
+        // stepA: click then finish
+        const tc = multiTurn === 1 ? makeToolCall("click", { index: 0 }) : makeToolCall("finish", { summary: "A done" });
+        return { content: "", toolCalls: [tc] };
+      }
+      if (!replanFired) return { content: "", toolCalls: [makeToolCall("click", { index: 99 })] };
+      // After replan: first post-replan finish completes B2; the next is C.
+      postReplanFinishes++;
+      const summary = postReplanFinishes === 1 ? "B2 done" : "C done";
+      return { content: "", toolCalls: [makeToolCall("finish", { summary })] };
+    },
+  };
+  let multiReplans = 0;
+  const multiRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "A" }, { description: "B" }, { description: "C" }] },
+    {
+      llm: multiLlm, bridge: multiBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {},
+      replan: async (g, step, ctx2) => { multiReplans++; replanFired = true; replanDoneArg = (ctx2 && ctx2.done) || []; return { goal: "g", steps: [{ description: "B2" }, { description: "C" }] }; },
+      maxTurns: 12, maxStepRetries: 2, isStopped: () => false,
+    }
+  );
+  assert(multiReplans === 1, "multi-step task replans once");
+  assert(multiRes.ok && multiRes.summary === "C done", "multi-step task completes after replan");
+  assert(JSON.stringify(replanDoneArg) === JSON.stringify(["A"]), "replan receives the completed step list");
+
+
+
   // ── executor respects stop ──
   const res3 = await executorMod.execute(
     { goal: "g", steps: [{ description: "s" }] },

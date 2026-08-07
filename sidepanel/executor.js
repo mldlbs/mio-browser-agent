@@ -645,11 +645,16 @@ async function execute(plan, ctx) {
         return { ok: false, error: `exceeded ${replans} replans`, resume: buildResume() };
       }
       ctx.onLog("warn", `步骤连续失败，重新规划: ${step.description}`);
-      const newPlan = await ctx.replan(plan.goal, step);
+      // Replan from the CURRENT step, not from step 0. The new plan replaces
+      // only the steps from here onward; already-completed steps stay done so
+      // a long task does not re-execute (and re-submit) finished work.
+      const newPlan = await ctx.replan(plan.goal, step, {
+        done: plan.steps.slice(0, current).map((s) => s.description),
+        failed: step.description,
+      });
       ctx.onLog("plan", "新计划: " + newPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
-      plan = newPlan;
-      runCtx.plan = newPlan;
-      current = 0;
+      plan.steps = plan.steps.slice(0, current).concat(newPlan.steps);
+      runCtx.plan = plan;
       attemptsForStep = 0;
       runCtx.recoveryAttempts = 0;
       runCtx.recoveryHistory = [];

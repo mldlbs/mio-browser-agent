@@ -36,11 +36,15 @@ async function plan(goal, llm) {
   return { goal, steps };
 }
 
-async function replan(goal, failedStep, llm) {
+async function replan(goal, failedStep, llm, ctx) {
+  const done = (ctx && ctx.done) || [];
+  const doneText = done.length
+    ? `\nAlready completed steps (do not repeat them):\n${done.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
+    : "";
   const resp = await llm.generate(
     [
       { role: "system", content: PLAN_PROMPT },
-      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan that fixes the problem.` },
+      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan for the REMAINING work only, starting from the failed step onward.${doneText}\nDo not include already-completed steps in the new plan.` },
     ],
     { tools: PLAN_TOOLS }
   );

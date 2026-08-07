@@ -30,7 +30,7 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
         llm, bridge, memory, onLog, onRecovery, onProgress,
         getTool, getToolsSchema,
         startStep: (resume && resume.nextStepIndex) || 0,
-        replan: (goal2, step) => planner.replan(goal2, step, llm),
+        replan: (goal2, step, ctx2) => planner.replan(goal2, step, llm, ctx2),
         maxTurns: deps.maxTurns || 8,
         maxStepRetries: deps.maxStepRetries || 3,
         maxSteps: deps.maxSteps || 30,
