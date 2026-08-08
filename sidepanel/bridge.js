@@ -103,6 +103,15 @@ function createPageBridge() {
         return null; // requires "activeTab" or host permission; caller degrades gracefully
       }
     },
+    // Navigate at the BROWSER level (chrome.tabs.update) so it works even when
+    // the current page's content script is unavailable (e.g. chrome://new-tab,
+    // view-source, PDF viewer). Returns once the update is issued; the caller
+    // waits for the new page's content script to become ready.
+    async navigate(url) {
+      const tab = await getActiveTab();
+      await chrome.tabs.update(tab.id, { url });
+      return { ok: true, value: `navigating to ${url}`, pendingNavigation: true };
+    },
     // Read the exact bitmap of a captcha canvas/img as a PNG data URL (much
     // crisper than a full-page screenshot for small verification codes).
     async captureCanvas(target) {

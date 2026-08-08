@@ -540,6 +540,29 @@ function assertEq(got, want, name) {
   const tb = await registryMod.getTool("tab").execute({ mode: "bogus" }, { bridge: tabBridge, snapshot: snapStub });
   assert(!tb.ok, "tab unknown mode errors");
 
+  // ── navigate tool prefers browser-level navigation, falls back to content ──
+  const navCalls = [];
+  const navBridge = {
+    navigate: async (url) => { navCalls.push(["browser", url]); return { ok: true, value: "navigating to " + url, pendingNavigation: true }; },
+    executeAction: async (a) => { navCalls.push(["content", a.args.url]); return { ok: true, value: "content nav" }; },
+  };
+  const navTool = registryMod.getTool("navigate");
+  const navRes1 = await navTool.execute({ url: "https://bing.com" }, { bridge: navBridge });
+  assert(navRes1.ok && navCalls[0][0] === "browser", "navigate uses browser-level tabs.update when available");
+  const navCalls2 = [];
+  const legacyBridge = { executeAction: async (a) => { navCalls2.push(a.args.url); return { ok: true, value: "content nav" }; } };
+  const navRes2 = await navTool.execute({ url: "https://x.com" }, { bridge: legacyBridge });
+  assert(navRes2.ok && navCalls2[0] === "https://x.com", "navigate falls back to content-script navigation when bridge has no navigate");
+  const navCalls3 = [];
+  const throwingBridge = {
+    navigate: async () => { throw new Error("Cannot access a chrome:// URL"); },
+    executeAction: async (a) => { navCalls3.push(a.args.url); return { ok: true, value: "content nav" }; },
+  };
+  const navRes3 = await navTool.execute({ url: "https://y.com" }, { bridge: throwingBridge });
+  assert(navRes3.ok && navCalls3[0] === "https://y.com", "navigate falls back when browser-level navigation throws");
+  const navMissing = await navTool.execute({}, { bridge: legacyBridge });
+  assert(!navMissing.ok, "navigate requires url");
+
   // ── memory ──
   const mem = memoryMod.createMemory();
   const s1 = { url: "u", title: "t", elements: [{ role: "button", name: "A" }, { role: "button", name: "B" }] };
