@@ -52,6 +52,7 @@ Use tools to manipulate the page. Rules:
 - Login forms often include a verification code (验证码/captcha) drawn on a canvas or img element. To read it, call the read_captcha tool — it screenshots the page and has the vision model read the 4 characters; then type the result into the 验证码 input. read_captcha is the ONLY captcha-reading tool and needs no other screenshot tool. If a captcha looks unreadable, click the captcha image first to refresh it, then call read_captcha again. Never declare a captcha unreadable before calling read_captcha at least once.
 - You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
 - After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).
+- Data that must survive a tab switch, a replan, or long tasks MUST be saved with the memo tool (memo set key=value) and read back with memo get. Conversation history is trimmed during long runs, so a value read on an earlier page may no longer be in context — always memo it before leaving the page (e.g. memo the verification code from an email tab, then memo get it on the login tab). Do not type or retype values from memory: use memo get to fetch the exact value.
 - On Reddit, never navigate to moderator-only /mod/... URLs (e.g. /mod/<sub>/rules) — those are blocked for normal users and trigger captchas. To read a subreddit's rules use the public page: https://www.reddit.com/r/<sub>/about/rules/. Avoid scraping reddit.com site-wide.`;
 
 function buildSystemPrompt(goal, plan, step) {
@@ -121,7 +122,7 @@ async function executeStep(step, ctx) {
     const diff = ctx.memory.remember(snapshot);
     ctx.history.push({ 
       role: "user", 
-      content: snapshotToLines(snapshot) + changeNote(ctx.memory.diff || diff) 
+      content: snapshotToLines(snapshot) + changeNote(ctx.memory.diff || diff) + notesNote(ctx.notes)
     });
     onLog("debug", _snapshotStats(snapshot));
     
@@ -231,7 +232,7 @@ async function executeStep(step, ctx) {
       
       let result;
       try {
-        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory, llm: ctx.visionLlm || ctx.llm });
+        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory, notes: ctx.notes, llm: ctx.visionLlm || ctx.llm });
       } catch (e) {
         // Tool exceptions are immediate failures (not recoverable)
         result = { ok: false, error: (e && e.message) || String(e), errorCode: "TOOL_EXCEPTION" };
@@ -603,6 +604,12 @@ async function safeSnapshot(bridge) {
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
+// Lazy notes factory so executor works in unit tests that don't require notes.js.
+function createNotesSession() {
+  const notesMod = typeof module !== "undefined" ? require("./notes.js") : globalThis.NotesModule;
+  return notesMod.createNotes();
+}
+
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 function trimHistory(history, maxLen) {
@@ -623,6 +630,12 @@ function changeNote(diff) {
   return `\nChanged: added ${diff.added.join(", ") || "(none)"}; removed ${diff.removed.join(", ") || "(none)"}`;
 }
 
+function notesNote(notes) {
+  if (!notes || typeof notes.render !== "function") return "";
+  const rendered = notes.render();
+  return rendered ? `\n\n${rendered}` : "";
+}
+
 async function execute(plan, ctx) {
   // Initialize trace
   const traceId = _startTrace(plan.goal);
@@ -638,8 +651,15 @@ async function execute(plan, ctx) {
   
   runCtx.recoveryHistory = [];
   runCtx.recoveryAttempts = 0;
+  runCtx.notes = ctx.notes || createNotesSession();
 
-  const buildResume = () => ({ goal: plan.goal, plan, nextStepIndex: current, lastSummary });
+  const buildResume = () => ({
+    goal: plan.goal,
+    plan,
+    nextStepIndex: current,
+    lastSummary,
+    notes: runCtx.notes.size ? runCtx.notes.toJSON() : undefined,
+  });
   const emitCheckpoint = () => { if (ctx.onCheckpoint) ctx.onCheckpoint(buildResume()); };
 
   const emitProgress = (status, extra = {}) => {
@@ -697,6 +717,7 @@ async function execute(plan, ctx) {
       const newPlan = await ctx.replan(plan.goal, step, {
         done: plan.steps.slice(0, current).map((s) => s.description),
         failed: step.description,
+        notes: runCtx.notes.size ? runCtx.notes.toJSON() : null,
       });
       ctx.onLog("plan", "新计划: " + newPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
       plan.steps = plan.steps.slice(0, current).concat(newPlan.steps);
@@ -714,7 +735,7 @@ async function execute(plan, ctx) {
   return { ok: true, summary: lastSummary || "所有步骤完成" };
 }
 
-const executor = { execute, executeStep, buildSystemPrompt, trimHistory, changeNote, detectPageRisk, isStateChangingTool };
+const executor = { execute, executeStep, buildSystemPrompt, trimHistory, changeNote, notesNote, detectPageRisk, isStateChangingTool, createNotesSession };
 if (typeof module !== "undefined") {
   module.exports = executor;
 } else {

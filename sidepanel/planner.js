@@ -41,10 +41,14 @@ async function replan(goal, failedStep, llm, ctx) {
   const doneText = done.length
     ? `\nAlready completed steps (do not repeat them):\n${done.map((s, i) => `${i + 1}. ${s}`).join("\n")}`
     : "";
+  const notes = (ctx && ctx.notes) || null;
+  const notesText = notes && Object.keys(notes).length
+    ? `\nSession data already gathered (reuse it with memo, do not re-extract):\n${Object.entries(notes).map(([k, v]) => `${k}: ${v}`).join("\n")}`
+    : "";
   const resp = await llm.generate(
     [
       { role: "system", content: PLAN_PROMPT },
-      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan for the REMAINING work only, starting from the failed step onward.${doneText}\nDo not include already-completed steps in the new plan.` },
+      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan for the REMAINING work only, starting from the failed step onward.${doneText}${notesText}\nDo not include already-completed steps in the new plan.` },
     ],
     { tools: PLAN_TOOLS }
   );

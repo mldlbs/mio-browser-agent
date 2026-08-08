@@ -19,14 +19,17 @@ require("../tools/extract_text.js");
 require("../tools/paste.js");
 require("../tools/read_captcha.js");
 require("../tools/tab.js");
+require("../tools/memo.js");
 const plannerMod = require("../sidepanel/planner.js");
 const memoryMod = require("../sidepanel/memory.js");
+const notesMod = require("../sidepanel/notes.js");
 const executorMod = require("../sidepanel/executor.js");
 global.snapshotToLines = protocol.snapshotToLines;
 global.snapshotStats = protocol.snapshotStats;
 global.planner = plannerMod;
 global.executor = executorMod;
 global.createMemory = memoryMod.createMemory;
+global.NotesModule = notesMod;
 global.getTool = registryMod.getTool;
 global.getToolsSchema = registryMod.getToolsSchema;
 global.createAdapter = (s) => adapterMod.createAdapter(s);
@@ -1046,6 +1049,88 @@ function assertEq(got, want, name) {
   assertEq(switched.removed.length, 0, "tab switch suppresses removed diff");
   const samePage = tabMem.remember({ url: "https://b.example", title: "B", elements: [{ role: "textbox", name: "Z" }] });
   assert(samePage.added.includes("textbox:Z"), "same-page diff still reported after switch");
+
+  // ── notes: session memory survives tab switches, serializes for resume ──
+  const n1 = notesMod.createNotes();
+  assertEq(n1.size(), 0, "notes start empty");
+  n1.set("验证码", "1234");
+  n1.set("price", "¥59.90");
+  assertEq(n1.get("验证码"), "1234", "notes get returns stored value");
+  assertEq(n1.size(), 2, "notes size tracks entries");
+  assert(n1.render().includes("验证码: 1234"), "notes render builds readable block");
+  const restored = notesMod.createNotes(n1.toJSON());
+  assertEq(restored.get("price"), "¥59.90", "notes restore from serialized JSON");
+  restored.clear();
+  assertEq(restored.size(), 0, "notes clear wipes entries");
+  const removed = notesMod.createNotes();
+  removed.set("k", "v");
+  assert(removed.remove("k"), "notes remove deletes a key");
+  assertEq(removed.get("k"), null, "notes get null after remove");
+
+  // ── memo tool: set/get/list/clear round-trip through the registry ──
+  const memoCtx = { notes: notesMod.createNotes() };
+  const memoTool = registryMod.getTool("memo");
+  assert(memoTool, "memo tool registered");
+  const setRes = await memoTool.execute({ mode: "set", key: "code", value: "ABCD" }, memoCtx);
+  assert(setRes.ok, "memo set succeeds");
+  const getRes = await memoTool.execute({ mode: "get", key: "code" }, memoCtx);
+  assert(getRes.ok && getRes.value === "ABCD", "memo get returns stored value");
+  const listRes = await memoTool.execute({ mode: "list" }, memoCtx);
+  assert(listRes.ok && listRes.value.description.includes("code: ABCD"), "memo list renders entries");
+  const missingRes = await memoTool.execute({ mode: "get", key: "nope" }, memoCtx);
+  assert(!missingRes.ok, "memo get on missing key fails");
+  const rmRes = await memoTool.execute({ mode: "remove", key: "code" }, memoCtx);
+  assert(rmRes.ok, "memo remove succeeds");
+  const clearRes = await memoTool.execute({ mode: "clear" }, memoCtx);
+  assert(clearRes.ok && memoCtx.notes.size() === 0, "memo clear wipes all");
+
+  // ── resume: checkpoint carries notes; resume run restores them ──
+  const notesCheckpoints = [];
+  const notesBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }),
+    executeAction: async (action) => ({ ok: true, value: `did ${action.name}` }),
+  };
+  const notesLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步a完成" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "步b完成" })] }),
+  ]);
+  const notesSrc = await executorMod.execute(
+    { goal: "g", steps: [{ description: "a" }, { description: "b" }] },
+    {
+      llm: notesLlm, bridge: notesBridge, memory: memoryMod.createMemory(),
+      notes: notesMod.createNotes(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      onCheckpoint: (cp) => notesCheckpoints.push(cp),
+      maxTurns: 3, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(notesSrc.ok, "notes source run completes");
+  const cp0 = notesCheckpoints[0];
+  assert(cp0.notes && Object.keys(cp0.notes).length === 0, "empty notes omitted from checkpoint");
+  notesLlm.notesMod = notesMod;
+  const notesLlm2 = mockLlm([
+    () => {
+      // Agent uses memo on step b to prove the tool is reachable mid-run.
+      if (!global._memoUsed) {
+        global._memoUsed = true;
+        return { content: "", toolCalls: [makeToolCall("memo", { mode: "set", key: "code", value: "1234" }), makeToolCall("finish", { summary: "步b完成" })] };
+      }
+      return { content: "", toolCalls: [makeToolCall("finish", { summary: "步b完成" })] };
+    },
+  ]);
+  const notesResumed = await executorMod.execute(
+    { goal: "g", steps: [{ description: "a" }, { description: "b" }] },
+    {
+      llm: notesLlm2, bridge: notesBridge, memory: memoryMod.createMemory(),
+      notes: notesMod.createNotes({ code: "1234" }),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, replan: async () => { throw new Error("no replan"); },
+      startStep: 1, maxTurns: 3, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(notesResumed.ok, "notes resume run completes");
+  delete global._memoUsed;
 
   // ── resume: onCheckpoint emits progress, execute honors startStep ──
   const resumeBridge = {

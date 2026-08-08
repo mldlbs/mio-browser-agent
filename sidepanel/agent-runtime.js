@@ -1,6 +1,7 @@
 function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = () => {}, onState = () => {}, onProgress = () => {}, deps = {} }) {
   const llm = deps.llm || createAdapter(settings);
   const memory = createMemory();
+  const notesMod = deps.notes || (typeof module !== "undefined" ? require("./notes.js") : globalThis.NotesModule);
   let stopRequested = false;
 
   // Vision fallback uses its own adapter when the user configured a dedicated
@@ -26,8 +27,9 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
       }
       onLog("plan", planDoc.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
       onState("running");
+      const notes = notesMod.createNotes(resume && resume.notes ? resume.notes : null);
       const result = await executor.execute(planDoc, {
-        llm, bridge, memory, onLog, onRecovery, onProgress,
+        llm, bridge, memory, notes, onLog, onRecovery, onProgress,
         getTool, getToolsSchema,
         startStep: (resume && resume.nextStepIndex) || 0,
         replan: (goal2, step, ctx2) => planner.replan(goal2, step, llm, ctx2),
