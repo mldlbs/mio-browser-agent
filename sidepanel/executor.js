@@ -52,7 +52,7 @@ Use tools to manipulate the page. Rules:
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
 - If you can SEE the target on the page but it is not in the snapshot list (canvas/overlay/dynamic content the DOM locator misses), use the click_at tool with its viewport coordinates (x, y) instead of giving up or guessing a snapshot index. Prefer the normal click tool by snapshot index whenever the element IS listed.
-- NEVER guess click_at coordinates blindly. Only call click_at with (x, y) values you actually know: from a vision_locate hint the system injected, or from a coordinate you can reason about precisely. If you do not know the exact pixel position, do NOT spam click_at at made-up coordinates — instead describe the target element precisely and call finish for the step, or wait for the system's vision guidance. Blind coordinate spam on the same area repeatedly is how tasks spiral into replans; a click that changes nothing on the page means the target was not hit, so stop guessing.
+- NEVER guess click_at coordinates blindly. Only call click_at with (x, y) values you actually know: from a find_by_vision or vision_locate result, or from a coordinate you can reason about precisely. If the target is visible but not in the snapshot and you do NOT know its pixel position, call find_by_vision with a precise description of the target — it returns the exact coordinates to click. Do NOT spam click_at at made-up coordinates; a click that changes nothing on the page means the target was not hit, so stop guessing.
 - On Reddit, never navigate to moderator-only /mod/... URLs (e.g. /mod/<sub>/rules) — those are blocked for normal users and trigger captchas. To read a subreddit's rules use the public page: https://www.reddit.com/r/<sub>/about/rules/. Avoid scraping reddit.com site-wide.`;
 
 // Step-type focus blocks. Each is injected (as {stepFocus}) when the current
@@ -261,7 +261,7 @@ async function executeStep(step, ctx) {
       
       let result;
       try {
-        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory, notes: ctx.notes, llm: ctx.visionLlm || ctx.llm });
+        result = await tool.execute(tc.args, { bridge, snapshot: ctx.lastSnapshot, memory: ctx.memory, notes: ctx.notes, llm: ctx.visionLlm || ctx.llm, enableVision: !!ctx.enableVision });
       } catch (e) {
         // Tool exceptions are immediate failures (not recoverable)
         result = { ok: false, error: (e && e.message) || String(e), errorCode: "TOOL_EXCEPTION" };

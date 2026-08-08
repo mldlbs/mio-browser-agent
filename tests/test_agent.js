@@ -23,6 +23,7 @@ require("../tools/read_captcha.js");
 require("../tools/tab.js");
 require("../tools/memo.js");
 require("../tools/click_at.js");
+require("../tools/find_by_vision.js");
 const plannerMod = require("../sidepanel/planner.js");
 const memoryMod = require("../sidepanel/memory.js");
 const notesMod = require("../sidepanel/notes.js");
@@ -1688,6 +1689,24 @@ function assertEq(got, want, name) {
   );
   assert(spamLogs.some(([t, x]) => t === "tool" && x.includes("盲试拦截")), "click_at spam guard flags repeated same-coordinate clicks");
   assert(spamRecovery.some((e) => e.code === "CLICK_AT_UNVERIFIED"), "spam guard flows to recovery with CLICK_AT_UNVERIFIED");
+
+  // ── find_by_vision tool: sight-based location for snapshot-missing targets ──
+  const fbvTool = registryMod.getTool("find_by_vision");
+  assert(fbvTool, "find_by_vision tool registered");
+  const fbvVision = { generate: async (msgs, opts) => ({ content: "目标可见。x:320, y:240" }) };
+  const fbvBridge = { capture: async () => "data:image/png;base64,AAAA" };
+  const fbvOk = await fbvTool.execute({ target: "红框的视觉兜底目标" }, { bridge: fbvBridge, llm: fbvVision, enableVision: true });
+  assert(fbvOk.ok && fbvOk.value.x === 320 && fbvOk.value.y === 240, "find_by_vision returns coordinates");
+  const fbvHidden = await fbvTool.execute({ target: "不存在的东西" }, { bridge: fbvBridge, llm: { generate: async () => ({ content: "不可见，页面上没有" }) }, enableVision: true });
+  assert(!fbvHidden.ok && fbvHidden.errorCode === "VISION_TARGET_HIDDEN", "find_by_vision reports hidden target");
+  const fbvNoCap = await fbvTool.execute({ target: "x" }, { bridge: {}, llm: fbvVision, enableVision: true });
+  assert(!fbvNoCap.ok && fbvNoCap.errorCode === "VISION_UNAVAILABLE", "find_by_vision requires capture bridge");
+  const fbvNoLlm = await fbvTool.execute({ target: "x" }, { bridge: fbvBridge, llm: null, enableVision: true });
+  assert(!fbvNoLlm.ok && fbvNoLlm.errorCode === "VISION_UNAVAILABLE", "find_by_vision reports unconfigured vision");
+  const fbvNoTarget = await fbvTool.execute({}, { bridge: fbvBridge, llm: fbvVision, enableVision: true });
+  assert(!fbvNoTarget.ok, "find_by_vision requires target description");
+  const fbvDisabled = await fbvTool.execute({ target: "x" }, { bridge: fbvBridge, llm: fbvVision, enableVision: false });
+  assert(!fbvDisabled.ok && fbvDisabled.errorCode === "VISION_UNAVAILABLE", "find_by_vision requires vision enabled");
 
   // A state-changing action (paste) between two clicks DOES clear the guard, so
   // a later distinct click on the same target is allowed.
