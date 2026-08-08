@@ -52,6 +52,7 @@ Use tools to manipulate the page. Rules:
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
 - If you can SEE the target on the page but it is not in the snapshot list (canvas/overlay/dynamic content the DOM locator misses), use the click_at tool with its viewport coordinates (x, y) instead of giving up or guessing a snapshot index. Prefer the normal click tool by snapshot index whenever the element IS listed.
+- NEVER guess click_at coordinates blindly. Only call click_at with (x, y) values you actually know: from a vision_locate hint the system injected, or from a coordinate you can reason about precisely. If you do not know the exact pixel position, do NOT spam click_at at made-up coordinates — instead describe the target element precisely and call finish for the step, or wait for the system's vision guidance. Blind coordinate spam on the same area repeatedly is how tasks spiral into replans; a click that changes nothing on the page means the target was not hit, so stop guessing.
 - On Reddit, never navigate to moderator-only /mod/... URLs (e.g. /mod/<sub>/rules) — those are blocked for normal users and trigger captchas. To read a subreddit's rules use the public page: https://www.reddit.com/r/<sub>/about/rules/. Avoid scraping reddit.com site-wide.`;
 
 // Step-type focus blocks. Each is injected (as {stepFocus}) when the current
@@ -269,6 +270,26 @@ async function executeStep(step, ctx) {
       ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
       const shown = result.value == null ? "ok" : (typeof result.value === "string" ? result.value.slice(0, 120) : JSON.stringify(result.value).slice(0, 120));
       onLog("tool", `${tc.name} → ${result.ok ? shown : "ERR " + result.error}`);
+
+      // ── Click_at spam guard ──
+      // If the agent clicks the SAME coordinates again and the page did not
+      // change at all, it is guessing blindly (observed: 4+ clicks at ~(100,4xx)
+      // while hunting a vision-only element). Flag it so it flows into the
+      // recovery chain (which can invoke vision_locate) instead of looping.
+      if (tc.name === "click_at" && result.ok && ctx.lastSnapshot) {
+        const key = `${Math.round(tc.args.x || 0)},${Math.round(tc.args.y || 0)}`;
+        const sig = `${ctx.lastSnapshot.url || ""}|${(ctx.lastSnapshot.elements || []).length}`;
+        const prev = ctx._clickAtLast;
+        if (prev && prev.key === key && prev.sig === sig && ctx._clickAtSpamWarned !== key) {
+          ctx._clickAtSpamWarned = key;
+          result = { ok: false, error: "click_at hit the same coordinates with no page change; the target was likely not there. Do not keep guessing coordinates — describe the target and wait for vision guidance, or use a snapshot index.", errorCode: "CLICK_AT_UNVERIFIED" };
+          ctx.history.pop();
+          ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+          onLog("tool", `click_at → 盲试拦截 (${key} 无页面变化)`);
+        } else {
+          ctx._clickAtLast = { key, sig };
+        }
+      }
 
       // Human-paced pacing: state-changing actions get a random 300-900ms pause
       // before the next turn so the page settles and the timing looks natural

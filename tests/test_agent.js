@@ -1663,6 +1663,32 @@ function assertEq(got, want, name) {
   assert(dupExecShift.ok, "re-render (index shift) step still completes");
   assertEq(shiftCalls.filter((n) => n === "click").length, 1, "duplicate guard fires across index shift via stable name");
 
+  // ── click_at spam guard: same coords + no page change → CLICK_AT_UNVERIFIED ──
+  const spamLogs = [];
+  const spamRecovery = [];
+  const spamBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "b" }] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
+  };
+  const spamLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 100, y: 470 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 100, y: 470 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }),
+  ]);
+  const spamExec = await executorMod.executeStep(
+    { description: "点目标" },
+    {
+      llm: spamLlm, bridge: spamBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: (t, x) => spamLogs.push([t, x]), onRecovery: (ev) => spamRecovery.push(ev),
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点目标" }] }, goal: "g",
+      maxTurns: 4, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(spamLogs.some(([t, x]) => t === "tool" && x.includes("盲试拦截")), "click_at spam guard flags repeated same-coordinate clicks");
+  assert(spamRecovery.some((e) => e.code === "CLICK_AT_UNVERIFIED"), "spam guard flows to recovery with CLICK_AT_UNVERIFIED");
+
   // A state-changing action (paste) between two clicks DOES clear the guard, so
   // a later distinct click on the same target is allowed.
   const clickCalls3 = [];
