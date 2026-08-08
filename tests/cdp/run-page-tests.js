@@ -80,6 +80,14 @@ const { openTab, runInPage, report } = require("./page-runner");
       const atVt = await executeAction({ name: "clickAt", target: null, args: { x: Math.round(vtRect.x + vtRect.width / 2), y: Math.round(vtRect.y + vtRect.height / 2) } });
       check(atVt.ok && window.__visionClicks === 1, "clickAt hits the vision-only target (pointerdown)", (atVt && atVt.error) || "");
 
+      // scroll: reaching the bottom reports a boundary signal instead of a
+      // silent no-op, so the agent stops blind scrolling (was a 500kpx loop).
+      const bottomScroll = await executeAction({ name: "scroll", target: null, args: { delta: 1000000 } });
+      const bottomSignal = (bottomScroll.ok && /bottom/.test(bottomScroll.value || "")) || (!bottomScroll.ok && bottomScroll.errorCode === "SCROLL_AT_END");
+      check(bottomSignal, "scroll at bottom yields a boundary signal", JSON.stringify(bottomScroll));
+      const overScroll = await executeAction({ name: "scroll", target: null, args: { delta: 500 } });
+      check(!overScroll.ok && overScroll.errorCode === "SCROLL_AT_END", "scroll past bottom returns SCROLL_AT_END", (overScroll && overScroll.error) || "");
+
       // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）
       const cctx = document.getElementById("captcha-canvas").getContext("2d");
       cctx.fillStyle = "#fff"; cctx.fillRect(0, 0, 120, 40);

@@ -112,8 +112,24 @@ function clickAt(x, y) {
 async function executeAction(action) {
   const { name, target, args } = action;
   if (name === "scroll") {
+    const beforeY = window.scrollY;
     window.scrollBy({ top: args.delta, behavior: "auto" });
-    return { ok: true, value: `scrolled by ${args.delta}px` };
+    const afterY = window.scrollY;
+    const atBottom = window.innerHeight + afterY >= document.documentElement.scrollHeight - 2;
+    const moved = Math.abs(afterY - beforeY) < 2;
+    // Boundary reached AND no movement: report it as an error so the agent
+    // stops blind scrolling (was an unbounded 500kpx loop). A successful
+    // scroll that happens to land at the bottom still returns ok.
+    if (moved && args.delta > 0 && atBottom) {
+      return { ok: false, error: "scroll: already at the bottom, cannot scroll further down", errorCode: "SCROLL_AT_END" };
+    }
+    if (moved && args.delta < 0) {
+      return { ok: false, error: "scroll: already at the top, cannot scroll further up", errorCode: "SCROLL_AT_END" };
+    }
+    if (atBottom) {
+      return { ok: true, value: "scrolled to bottom of page" };
+    }
+    return { ok: true, value: `scrolled by ${afterY - beforeY}px` };
   }
   if (name === "navigate") {
     location.href = args.url;
