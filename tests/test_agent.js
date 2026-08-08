@@ -582,6 +582,23 @@ function assertEq(got, want, name) {
   assert(replanText.includes("1234"), "replan prompt carries gathered notes");
   assert(replanText.includes("已完成的步骤"), "replan prompt lists completed steps");
 
+  // ── classifyStep + step-type focus blocks ──
+  assertEq(executorMod.classifyStep("在登录页输入验证码"), "login", "classifyStep detects login/captcha");
+  assertEq(executorMod.classifyStep("发送消息并等待回复"), "send", "classifyStep detects send");
+  assertEq(executorMod.classifyStep("打开邮箱拿验证码"), "tab", "classifyStep detects cross-page/tab");
+  assertEq(executorMod.classifyStep("提取商品价格"), "extract", "classifyStep detects extract");
+  assertEq(executorMod.classifyStep("打开首页并确认加载"), "open", "classifyStep detects open/confirm");
+  assertEq(executorMod.classifyStep("随便一个步骤"), "", "classifyStep returns empty for unknown");
+  const loginPrompt = executorMod.buildSystemPrompt("g", { steps: [{ description: "登录" }] }, { description: "在登录页输入验证码" });
+  assert(loginPrompt.includes("read_captcha"), "login step prompt injects captcha focus");
+  assert(loginPrompt.includes("图标按钮") === false, "login step prompt omits send icon rules");
+  const openPrompt = executorMod.buildSystemPrompt("g", { steps: [{ description: "打开" }] }, { description: "打开首页并确认加载" });
+  assert(openPrompt.includes("页面打开且内容与描述匹配"), "open step prompt injects confirm focus");
+  assert(openPrompt.includes("read_captcha") === false, "open step prompt omits captcha rules");
+  const plainPrompt = executorMod.buildSystemPrompt("g", { steps: [{ description: "x" }] }, { description: "随便" });
+  assert(!plainPrompt.includes("页面打开且内容与描述匹配"), "generic step gets no focus block");
+  assert(plainPrompt.includes("Current step: 随便"), "generic step keeps core prompt");
+
   // ── executor happy path ──
   const snapShots = [{ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }];
   const execBridge = {

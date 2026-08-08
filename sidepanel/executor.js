@@ -22,11 +22,16 @@ const _runVisionFallback = visionMod ? visionMod.runVisionFallback : null;
 const _runSendConfirm = visionMod ? visionMod.runSendConfirm : null;
 
 // AGENT_PROMPT and buildSystemPrompt
+// Core rules always apply; step-type-specific blocks are injected by
+// classifyStep so a pure "open page" step does not carry the full send/login/
+// cross-page rule set (less noise per turn, better focus).
 const AGENT_PROMPT = `You are a web automation agent operating in the user's Chrome browser.
 Goal: {goal}
 Plan:
 {plan}
 Current step: {step}
+
+{stepFocus}
 
 You receive the page as a numbered list of interactive elements:
 [0] link "首页"
@@ -42,25 +47,47 @@ Use tools to manipulate the page. Rules:
 - finish marks the CURRENT step complete; the system then advances you to the next step. It does not end the whole task.
 - If the current step is purely informational and the needed information is already in the conversation, you may call finish immediately. But if the step requires an action (typing, clicking, sending, extracting), execute that action with tools FIRST — never declare a step complete without doing its required action.
 - Steps are tracked one by one: finish completes ONLY the current step and the system advances you to the next one. Never perform a later step's actions (typing credentials, reading captchas, clicking submit, extracting) while on the current step — the progress panel records each step as you finish it.
-- For opening/confirmation steps (e.g. "open URL and confirm the page shows X"): as soon as the page is open and matches the description, call finish immediately. Do not start typing, reading captchas, or clicking even if the form looks ready.
 - Never claim success you cannot verify.
 - Links show their destination after '→'. On shopping/search pages prefer product-card links (e.g. href containing /item/, /dp/, /product/) over shop or category links (e.g. /store/, /shop/, /seller/). Avoid clicking a shop link when you want a product.
 - To find another product later, first finish the current step; the system advances you to the next step.
 - If the page has not changed after a click or navigate (same URL), try again or report the problem instead of fabricating new URLs.
-- After clicking a submit/send button, WAIT for the page to respond (new message, loading indicator, navigation) before doing anything else. Do NOT click the same button twice — a repeated click on a send button re-submits the same input and can double-send. If a click result is uncertain, verify via the snapshot instead of clicking again. The system automatically verifies send clicks (input cleared / new message / vision confirm); a "发送未确认" error means the send did NOT go through — retry the send, or type again and press the send control, instead of assuming it worked.
-- Icon-only buttons (e.g. named "图标按钮(输入框右下)") have no visible label. When you need to submit/send, pick the icon button annotated as beside/below the textbox you just typed into (look for "输入框右下"/"输入框下"/"输入框旁") — the send control sits at the bottom-right of the chat input. Do not click random icon buttons elsewhere on the page.
-- Login forms often include a verification code (验证码/captcha) drawn on a canvas or img element. To read it, call the read_captcha tool — it screenshots the page and has the vision model read the 4 characters; then type the result into the 验证码 input. read_captcha is the ONLY captcha-reading tool and needs no other screenshot tool. If a captcha looks unreadable, click the captcha image first to refresh it, then call read_captcha again. Never declare a captcha unreadable before calling read_captcha at least once.
-- You can work across multiple tabs. The snapshot header shows your active tab (Tab i/n) and all open tabs. Use the tab tool: mode=list to see all tabs, mode=open to create a new tab at a URL, mode=switch to focus another tab, mode=close to remove one.
-- After switching or opening a tab, a fresh snapshot of the new active tab is provided on the next turn. Copy text from one tab and type it into another when a task spans pages (e.g. copy a code from an email tab into a login form tab).
-- Data that must survive a tab switch, a replan, or long tasks MUST be saved with the memo tool (memo set key=value) and read back with memo get. Conversation history is trimmed during long runs, so a value read on an earlier page may no longer be in context — always memo it before leaving the page (e.g. memo the verification code from an email tab, then memo get it on the login tab). Do not type or retype values from memory: use memo get to fetch the exact value.
 - If you can SEE the target on the page but it is not in the snapshot list (canvas/overlay/dynamic content the DOM locator misses), use the click_at tool with its viewport coordinates (x, y) instead of giving up or guessing a snapshot index. Prefer the normal click tool by snapshot index whenever the element IS listed.
 - On Reddit, never navigate to moderator-only /mod/... URLs (e.g. /mod/<sub>/rules) — those are blocked for normal users and trigger captchas. To read a subreddit's rules use the public page: https://www.reddit.com/r/<sub>/about/rules/. Avoid scraping reddit.com site-wide.`;
 
+// Step-type focus blocks. Each is injected (as {stepFocus}) when the current
+// step's description matches that type, keeping irrelevant rules out of the
+// prompt for steps that do not need them.
+const STEP_FOCUS = {
+  open: `- 本步骤是打开/确认页面：页面打开且内容与描述匹配后，立即调用 finish 并附一行总结。不要开始输入、读取验证码或点击，即使表单看起来已就绪。`,
+  send: `- 点击发送/提交按钮后 WAIT 让页面响应（新消息、加载指示、跳转），不要重复点击同一按钮——重复点击会重复提交。系统会自动验证发送（输入框清空/新消息/视觉确认）；「发送未确认」说明发送未成功——重试发送，或重新输入后再点发送控件，不要假定已发出。
+- 图标按钮（如「图标按钮(输入框右下)」）无可见文字。提交/发送时，选你在其中输入过文字的输入框右下/下/旁的图标按钮（聊天发送键在输入框右下角）。不要点页面上其它随机图标按钮。`,
+  login: `- 登录表单常含验证码（canvas/img）。用 read_captcha 工具读取——它截屏并由视觉模型读出字符，然后输入到验证码框。read_captcha 是唯一读取验证码的工具，无需其它截图工具。验证码看不清先点它刷新再重读；调用 read_captcha 至少一次前，不要判定验证码不可读。`,
+  tab: `- 任务可跨多个标签页：用 tab 工具 list 查看所有页、open 新开、switch 切换、close 关闭；快照头显示当前标签页（Tab i/n）。切换/新开后下一轮会提供新标签页的完整快照。
+- 跨页搬运的数据（验证码、价格、提取的 id）MUST 用 memo set 保存、memo get 读取。对话历史在长任务中会被裁剪，早前读到的值可能已不在上下文——离开页面（如邮箱验证码）前先 memo，目标页上再 memo get。不要凭记忆重打。`,
+  extract: `- 本步骤需要提取页面数据：用 extract_text 提取正文，或从快照索引读取目标内容。若提取结果后续步骤还要用，先用 memo set 保存（key=value），需要时再 memo get。`,
+};
+
+// Classify a step description so buildSystemPrompt can inject only the
+// relevant focus block. Order matters: more specific patterns first. Note that
+// "验证码" alone is NOT login — reading a code from an email into a form is a
+// cross-page task; login intent requires an account/login action.
+function classifyStep(desc) {
+  const d = (desc || "").toLowerCase();
+  if (/(登录页|登录|账号|密码|用户名|login|sign\s*in|signin)/.test(d)) return "login";
+  if (/(发送|提交|回复|发布|send|submit|post|reply)/.test(d)) return "send";
+  if (/(标签页|切换|新标签|邮箱|另一个站|跨站|跨页|新窗口|tab\b)/.test(d)) return "tab";
+  if (/(提取|获取|读取|抓取|总结|要点|内容|extract|summarize|collect|scrape)/.test(d)) return "extract";
+  if (/(打开|确认|进入|访问|open|confirm|verify)/.test(d)) return "open";
+  return "";
+}
+
 function buildSystemPrompt(goal, plan, step) {
+  const focus = STEP_FOCUS[classifyStep(step.description)] || "";
   return AGENT_PROMPT
     .replace("{goal}", goal)
     .replace("{plan}", plan.steps.map((s, i) => `${i + 1}. ${s.description}`).join("\n"))
-    .replace("{step}", step.description);
+    .replace("{step}", step.description)
+    .replace("{stepFocus}", focus);
 }
 
 async function executeStep(step, ctx) {
@@ -748,7 +775,7 @@ async function execute(plan, ctx) {
   return { ok: true, summary: lastSummary || "所有步骤完成" };
 }
 
-const executor = { execute, executeStep, buildSystemPrompt, trimHistory, changeNote, notesNote, detectPageRisk, isStateChangingTool, createNotesSession };
+const executor = { execute, executeStep, buildSystemPrompt, classifyStep, trimHistory, changeNote, notesNote, detectPageRisk, isStateChangingTool, createNotesSession };
 if (typeof module !== "undefined") {
   module.exports = executor;
 } else {
