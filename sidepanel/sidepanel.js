@@ -102,11 +102,35 @@ function toast(msg) {
   appendLog("ui", msg);
 }
 
+// Render the one-click task templates above the goal box. Clicking a template
+// fills the goal textarea with its (placeholder) text.
+function renderTemplates() {
+  const host = $("composeTemplates");
+  if (!host) return;
+  const tmpls = (globalThis.TemplatesModule && TemplatesModule.TEMPLATES) || [];
+  host.innerHTML = "";
+  for (const t of tmpls) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "template-chip";
+    chip.textContent = t.label;
+    chip.title = t.hint || "";
+    chip.addEventListener("click", () => {
+      const box = $("goal");
+      box.value = t.goal;
+      box.focus();
+      box.setSelectionRange(0, 0);
+    });
+    host.appendChild(chip);
+  }
+}
+
 async function init() {
   const verEl = $("version");
   if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
     verEl.textContent = "v" + (chrome.runtime.getManifest().version || "");
   }
+  renderTemplates();
   const s = await getSettings();
   $("provider").value = s.provider;
   $("model").value = s.model;

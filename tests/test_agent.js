@@ -4,6 +4,7 @@ const contentExecMod = require("../content/executor.js");
 const locatorMod = require("../content/locator.js");
 const storage = require("../common/storage.js");
 const historyMod = require("../common/history.js");
+const templatesMod = require("../common/templates.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -348,6 +349,16 @@ function assertEq(got, want, name) {
   assert(shareRec.notes === undefined, "share record strips notes (no credential leak)");
   const shareMany = historyMod.buildShareRecord({ id: "x", goal: "g", logs: Array.from({ length: 400 }, (_, i) => ({ tag: "step", text: "l" + i })) });
   assertEq(shareMany.logs.length, 300, "share record caps logs at 300");
+
+  // ── templates ──
+  assert(templatesMod.TEMPLATES.length >= 4, "templates module ships common tasks");
+  const tCross = templatesMod.findTemplateById("cross-site");
+  assert(tCross, "templates include cross-site template");
+  const filled = templatesMod.applyTemplate(tCross, { source: "淘宝", target: "京东", item: "手机壳" });
+  assert(filled.includes("淘宝") && filled.includes("京东"), "applyTemplate substitutes placeholders");
+  assert(filled.includes("memo"), "cross-site template mentions memo");
+  const noFill = templatesMod.applyTemplate(tCross, {});
+  assert(noFill.includes("{source}"), "applyTemplate leaves unknown placeholders intact");
 
   await historyMod.clearHistory();
   delete global.chrome;

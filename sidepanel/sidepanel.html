@@ -146,6 +146,24 @@
       padding: 10px;
       box-shadow: 0 4px 24px rgba(0,0,0,.3);
     }
+    .compose-templates {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .template-chip {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--teal);
+      border-color: rgba(148,226,213,.35);
+      cursor: pointer;
+    }
+    .template-chip:hover {
+      background: rgba(148,226,213,.12);
+    }
     #goal {
       width: 100%;
       resize: none;
@@ -573,6 +591,7 @@
 
   <main>
     <section class="compose">
+      <div class="compose-templates" id="composeTemplates"></div>
       <textarea id="goal" placeholder="告诉 mio 你想做什么…&#10;例如：在搜索框输入 hello 并点击提交"></textarea>
       <div class="compose-actions">
         <button id="start">开始任务</button>
@@ -627,8 +646,9 @@
   <script src="../common/logger.js"></script>
   <script src="../common/protocol.js"></script>
   <script src="../common/storage.js"></script>
-  <script src="../common/history.js"></script>
-  <script src="recovery-events.js"></script>
+  <script src="../common/history.js"></script>           
+  <script src="../common/templates.js"></script>        
+  <script src="recovery-events.js"></script>             
   <script src="vision.js"></script>
   <script src="../llm/adapter.js"></script>              
   <script src="../llm/openai.js"></script>               
