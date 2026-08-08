@@ -309,11 +309,13 @@ async function executeStep(step, ctx) {
       }
 
       if (result.ok) {
-        // Count state-changing actions so a bare finish on a step that needed
-        // work can be detected (see _verifyStepOutcome).
-        if (tc.name === "click" || isStateChangingTool(tc.name)) {
-          ctx._stepActions++;
-        }
+        // Count successful actions so a bare finish on a step that needed work
+        // can be detected (see _verifyStepOutcome). This counts ANY successful
+        // tool (including read-only extract/memo), because a step whose output
+        // is extracted data or a memo save has done its work even though the
+        // page did not change. Only state-changing tools clear the
+        // duplicate-click guard below (different concern).
+        ctx._stepActions++;
         // Track the last successful click target so a duplicate click in the next
         // round is short-circuited (prevents double-submitting on chat pages).
         if (tc.name === "click" && result.ok) {

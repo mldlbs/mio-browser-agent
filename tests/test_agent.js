@@ -778,6 +778,45 @@ function assertEq(got, want, name) {
   assert(svRes.ok && svRes.summary === "actually did it", "step-outcome verification lets the corrected step finish");
   assert(svClicks === 1, "step-outcome verification forced a real action (click executed)");
 
+  // ── extract+memo steps count as work: finish passes without page change ──
+  const svBridge2 = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "textbox", name: "q" }] }),
+    executeAction: async (a) => ({ ok: true, value: a.name === "extract_text" ? { url: "u", title: "t", text: "要点一 要点二 要点三" } : "did " + a.name }),
+  };
+  const svLlm2 = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("extract_text", { maxChars: 4000 }), makeToolCall("memo", { mode: "set", key: "points", value: "要点一 要点二" })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "已提取并保存要点" })] }),
+  ]);
+  const svRes2 = await executorMod.executeStep(
+    { description: "提取正文前 3 个要点并保存到 memo" },
+    {
+      llm: svLlm2, bridge: svBridge2, memory: memoryMod.createMemory(),
+      notes: notesMod.createNotes(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, isStopped: () => false, maxTurns: 5, maxRecoveryAttempts: 2,
+      verifyStepOutcome: true,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "提取" }] }, goal: "g",
+    }
+  );
+  assert(svRes2.ok && svRes2.summary === "已提取并保存要点", "extract+memo step finish is NOT rejected (page unchanged is fine)");
+  const svLogs2 = [];
+  const svRes2b = await executorMod.executeStep(
+    { description: "提取" },
+    {
+      llm: mockLlm([
+        () => ({ content: "", toolCalls: [makeToolCall("extract_text", { maxChars: 4000 }), makeToolCall("memo", { mode: "set", key: "points", value: "要点一 要点二" })] }),
+        () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "已提取" })] }),
+      ]),
+      bridge: svBridge2, memory: memoryMod.createMemory(),
+      notes: notesMod.createNotes(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: (tag, text) => svLogs2.push([tag, text]), isStopped: () => false, maxTurns: 5, maxRecoveryAttempts: 2,
+      verifyStepOutcome: true,
+      history: [{ role: "system", content: "" }], plan: { goal: "g", steps: [{ description: "提取" }] }, goal: "g",
+    }
+  );
+  assert(!svLogs2.some(([t, x]) => t === "recovery" && x.includes("STEP_NOT_VERIFIED")), "extract+memo step never triggers STEP_NOT_VERIFIED");
+
   // Verification off (default): bare finish passes without any action.
   const noVerifyBridge = { snapshot: async () => ({ url: "u", title: "t", elements: [] }), executeAction: async () => ({ ok: true }) };
   const noVerifyLlm = mockLlm([
