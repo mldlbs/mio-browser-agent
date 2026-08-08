@@ -220,6 +220,21 @@ async function importHistory() {
   input.click();
 }
 
+// Export a single task as a shareable JSON: goal, plan steps, summary, and the
+// recovery/step log. Deliberately excludes resume (checkpoint/notes) so no
+// credentials or partial state leak; the receiver can only see what happened.
+function exportOneHistory(r) {
+  const share = HistoryModule.buildShareRecord(r);
+  const blob = new Blob([JSON.stringify(share, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mio-task-" + (r.id || "share").slice(0, 12) + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+  toast("已导出单条任务");
+}
+
 async function historyLog(goal) {
   if (!currentTask) return;
   const evRendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
@@ -299,6 +314,15 @@ function renderHistory() {
         startTask({ goal: r.goal });
       });
       actions.appendChild(replayBtn);
+      const shareBtn = document.createElement("button");
+      shareBtn.className = "history-share";
+      shareBtn.textContent = "分享";
+      shareBtn.title = "导出单条任务为分享 JSON（不含凭据/恢复令牌）";
+      shareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        exportOneHistory(r);
+      });
+      actions.appendChild(shareBtn);
       const badge = document.createElement("span");
       badge.className = "history-status";
       badge.textContent = r.status;

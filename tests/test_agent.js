@@ -336,6 +336,19 @@ function assertEq(got, want, name) {
   assert(impThrew, "importRecords rejects invalid payload");
   const impBad = await historyMod.importRecords([{ no: "id" }]);
   assert(!impBad.find((r) => !r.id), "importRecords skips records without id");
+
+  // ── buildShareRecord: shareable snapshot strips resume / sensitive state ──
+  const shareSrc = { id: "share1", goal: "跨站任务", status: "done", summary: "完成", startedAt: 1, finishedAt: 2, recoveries: 3, replans: 1, tags: ["跨站"], logs: [{ tag: "recover", text: "x" }], resume: { plan: {}, nextStepIndex: 4, notes: { 密码: "secret" } } };
+  const shareRec = historyMod.buildShareRecord(shareSrc);
+  assertEq(shareRec.app, "mio", "share record marks app");
+  assertEq(shareRec.goal, "跨站任务", "share record keeps goal");
+  assertEq(shareRec.recoveries, 3, "share record keeps recovery count");
+  assertEq(shareRec.logs.length, 1, "share record keeps logs");
+  assert(shareRec.resume === undefined, "share record strips resume (no checkpoint leak)");
+  assert(shareRec.notes === undefined, "share record strips notes (no credential leak)");
+  const shareMany = historyMod.buildShareRecord({ id: "x", goal: "g", logs: Array.from({ length: 400 }, (_, i) => ({ tag: "step", text: "l" + i })) });
+  assertEq(shareMany.logs.length, 300, "share record caps logs at 300");
+
   await historyMod.clearHistory();
   delete global.chrome;
 

@@ -59,6 +59,26 @@ async function clearHistory() {
   await chrome.storage.local.remove(HISTORY_KEY);
 }
 
+// Build a shareable, portable snapshot of a single task record. Deliberately
+// excludes resume (checkpoint/notes) so no credentials or partial state leak;
+// the receiver sees only what happened, not how to continue it.
+function buildShareRecord(r) {
+  const rec = normalizeRecord(r);
+  return {
+    app: "mio",
+    version: 1,
+    goal: rec.goal,
+    status: rec.status,
+    summary: rec.summary,
+    startedAt: rec.startedAt,
+    finishedAt: rec.finishedAt,
+    recoveries: rec.recoveries,
+    replans: rec.replans,
+    tags: rec.tags,
+    logs: rec.logs.slice(0, 300),
+  };
+}
+
 // Import records from an exported JSON (array of normalized records, or a
 // single record). Merges by id: existing ids are skipped, new ids are added at
 // the front, then the list is trimmed to MAX_RECORDS. Returns the merged list.
@@ -82,7 +102,7 @@ async function importRecords(raw) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, sortRecords, filterRecords, clearHistory, importRecords };
+  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord };
 } else {
   globalThis.HistoryModule = {
     HISTORY_KEY,
@@ -95,5 +115,6 @@ if (typeof module !== "undefined") {
     filterRecords,
     clearHistory,
     importRecords,
+    buildShareRecord,
   };
 }
