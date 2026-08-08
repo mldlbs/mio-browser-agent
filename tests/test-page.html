@@ -19,6 +19,12 @@
   <label for="input-captcha">验证码</label>
   <input id="input-captcha" type="text" placeholder="请输入验证码">
   <canvas id="captcha-canvas" width="120" height="50" style="border:1px solid #666; cursor:pointer; display:block;" onclick="window.__captchaClicks=(window.__captchaClicks||0)+1"></canvas>
+  <!-- Vision-fallback test target: visible + clickable but NOT interactive per
+       INTERACTIVE_SELECTOR (no onclick/role/button tag), so the DOM snapshot
+       never lists it and the vision_locate recovery path must find it by sight.
+       Uses addEventListener('pointerdown') so it stays out of the snapshot but
+       still records real clicks for verification. -->
+  <div id="vision-target" data-vision-test style="margin-top:40px; padding:14px 22px; display:inline-block; border:2px solid #f38ba8; border-radius:8px; color:#f38ba8; cursor:pointer;">视觉兜底目标</div>
 
   <script>
     (function () {
@@ -27,6 +33,8 @@
       root.innerHTML =
         '<button id="shadow-btn" onclick="window.__shadowClicks=(window.__shadowClicks||0)+1">幽灵按钮</button>' +
         '<input id="shadow-input" type="text" placeholder="shadow输入框">';
+      const vt = document.getElementById("vision-target");
+      if (vt) vt.addEventListener("pointerdown", () => { window.__visionClicks = (window.__visionClicks || 0) + 1; });
     })();
   </script>
 

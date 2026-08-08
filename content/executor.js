@@ -92,6 +92,8 @@ function doClick(el, clickCount) {
 // sequence. Bypasses snapshot-based DOM location entirely, so it works when the
 // target exists but the locator cannot find it (dynamic/canvas/overlay content).
 // Uses elementFromPoint so the event lands on whatever the user actually sees.
+// Also dispatches pointerdown/pointerup: modern UIs (React, web components)
+// often listen for pointer events, not mouse events.
 function clickAt(x, y) {
   const el = document.elementFromPoint(x, y);
   if (!el) return { ok: false, error: `no element at viewport (${x}, ${y})` };
@@ -99,7 +101,9 @@ function clickAt(x, y) {
     return { ok: false, error: "element at point is disabled", errorCode: "ELEMENT_DISABLED" };
   }
   const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y };
+  el.dispatchEvent(new PointerEvent("pointerdown", opts));
   el.dispatchEvent(new MouseEvent("mousedown", opts));
+  el.dispatchEvent(new PointerEvent("pointerup", opts));
   el.dispatchEvent(new MouseEvent("mouseup", opts));
   el.dispatchEvent(new MouseEvent("click", opts));
   return { ok: true, value: `clicked at (${x}, ${y})` };

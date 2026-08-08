@@ -67,6 +67,19 @@ const { openTab, runInPage, report } = require("./page-runner");
       const atRes = await executeAction({ name: "clickAt", target: null, args: { x: cx, y: cy } });
       check(atRes.ok && window.__clickedAt === 1, "executor clicks at viewport coordinates", (atRes && atRes.error) || "");
 
+      // vision-fallback target: visible+clickable but EXCLUDED from the snapshot
+      // (no onclick/role/button tag), so the vision_locate path must find it by sight.
+      const visionTarget = document.getElementById("vision-target");
+      check(!!visionTarget && getComputedStyle(visionTarget).display !== "none", "vision target exists and is visible");
+      const snap2 = captureSnapshot();
+      check(!snap2.elements.some((e) => e.name && e.name.includes("视觉兜底目标")), "vision target is NOT in the snapshot", "target leaked into snapshot");
+      window.__visionClicks = 0;
+      visionTarget.scrollIntoView({ block: "center" });
+      await new Promise((r) => setTimeout(r, 200));
+      const vtRect = visionTarget.getBoundingClientRect();
+      const atVt = await executeAction({ name: "clickAt", target: null, args: { x: Math.round(vtRect.x + vtRect.width / 2), y: Math.round(vtRect.y + vtRect.height / 2) } });
+      check(atVt.ok && window.__visionClicks === 1, "clickAt hits the vision-only target (pointerdown)", (atVt && atVt.error) || "");
+
       // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）
       const cctx = document.getElementById("captcha-canvas").getContext("2d");
       cctx.fillStyle = "#fff"; cctx.fillRect(0, 0, 120, 40);
