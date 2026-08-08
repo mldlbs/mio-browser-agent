@@ -519,6 +519,28 @@ function assertEq(got, want, name) {
   const fallback = await plannerMod.plan("随便干点啥", emptyPlanLlm);
   assertEq(fallback.steps.length, 1, "plan falls back to single step");
 
+  // ── planner is cross-page aware: prompt guides multi-site tasks ──
+  let planCapture = null;
+  const planCrossLlm = { generate: async (messages) => { planCapture = messages; return { content: "", toolCalls: [makeToolCall("submit_plan", { steps: [{ description: "开邮箱拿验证码" }, { description: "回登录页输入" }] })] }; } };
+  const planCross = await plannerMod.plan("用邮箱验证码登录", planCrossLlm);
+  assertEq(planCross.steps.length, 2, "plan parses cross-page steps");
+  const planSys = JSON.stringify(planCapture[0]);
+  assert(planSys.includes("memo"), "planner system prompt mentions memo for carrying data across tabs");
+  assert(planSys.includes("tab"), "planner system prompt mentions tab tool");
+  assert(planSys.includes("multiple sites") || planSys.includes("MULTIPLE"), "planner system prompt supports cross-site tasks");
+
+  // ── replan includes session notes so already-gathered data is reused ──
+  let replanCaptured = null;
+  const replanNotesLlm = { generate: async (messages) => { replanCaptured = messages; return { content: "", toolCalls: [makeToolCall("submit_plan", { steps: [{ description: "继续" }] })] }; } };
+  const replanDoc = await plannerMod.replan("g", { description: "失败步骤" }, replanNotesLlm, {
+    done: ["已完成的步骤"],
+    notes: { 验证码: "1234", price: "¥59" },
+  });
+  assert(replanDoc.steps.length === 1, "replan returns revised steps");
+  const replanText = JSON.stringify(replanCaptured);
+  assert(replanText.includes("1234"), "replan prompt carries gathered notes");
+  assert(replanText.includes("已完成的步骤"), "replan prompt lists completed steps");
+
   // ── executor happy path ──
   const snapShots = [{ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "登录" }] }];
   const execBridge = {
