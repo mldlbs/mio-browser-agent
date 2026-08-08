@@ -25,6 +25,10 @@
        Uses addEventListener('pointerdown') so it stays out of the snapshot but
        still records real clicks for verification. -->
   <div id="vision-target" data-vision-test style="margin-top:40px; padding:14px 22px; display:inline-block; border:2px solid #f38ba8; border-radius:8px; color:#f38ba8; cursor:pointer;">视觉兜底目标</div>
+  <!-- Same-origin iframe: its interactive elements must appear in the snapshot
+       and be operable via framePath (cross-document location) from the main
+       frame's content script. -->
+  <iframe id="frame-box" srcdoc="<!DOCTYPE html><html><body><button id='frame-btn' onclick='window.__frameClicks=(window.__frameClicks||0)+1'>iframe按钮</button><input id='frame-input' type='text' placeholder='iframe输入框'></body></html>" style="margin-top:16px; width:320px; height:120px; border:1px solid #89b4fa;"></iframe>
 
   <script>
     (function () {

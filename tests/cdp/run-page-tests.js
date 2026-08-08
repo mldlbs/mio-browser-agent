@@ -80,6 +80,24 @@ const { openTab, runInPage, report } = require("./page-runner");
       const atVt = await executeAction({ name: "clickAt", target: null, args: { x: Math.round(vtRect.x + vtRect.width / 2), y: Math.round(vtRect.y + vtRect.height / 2) } });
       check(atVt.ok && window.__visionClicks === 1, "clickAt hits the vision-only target (pointerdown)", (atVt && atVt.error) || "");
 
+      // Same-origin iframe: elements are snapshotted, locatable via framePath,
+      // and operable cross-document from the main frame's content script.
+      const iframe = document.getElementById("frame-box");
+      check(!!iframe, "test page has a same-origin iframe");
+      const snapF = captureSnapshot();
+      const fBtn = snapF.elements.find((e) => e.name && e.name.includes("iframe按钮"));
+      check(!!fBtn && Array.isArray(fBtn.framePath) && fBtn.framePath.length >= 1, "snapshot captures iframe button with framePath", fBtn && JSON.stringify(fBtn.framePath));
+      const fInput = snapF.elements.find((e) => e.placeholder === "iframe输入框");
+      check(!!fInput && fInput.framePath.length >= 1, "snapshot captures iframe input with framePath", fInput && JSON.stringify(fInput.framePath));
+      const fBtnEl = locateElement(fBtn);
+      check(!!fBtnEl && fBtnEl.id === "frame-btn", "locator resolves iframe element via framePath", fBtnEl && fBtnEl.id);
+      const fClick = await executeAction({ name: "click", target: fBtn, args: {} });
+      const fClicks = (iframe.contentWindow && iframe.contentWindow.__frameClicks) || 0;
+      check(fClick.ok && fClicks === 1, "executor clicks iframe button (cross-document)", fClick.ok + " clicks=" + fClicks);
+      const fType = await executeAction({ name: "type", target: fInput, args: { text: "hi", clear: true } });
+      const fVal = iframe.contentWindow && iframe.contentWindow.document.getElementById("frame-input").value;
+      check(fType.ok && fVal === "hi", "executor types into iframe input (cross-document)", fVal);
+
       // scroll: reaching the bottom reports a boundary signal instead of a
       // silent no-op, so the agent stops blind scrolling (was a 500kpx loop).
       const bottomScroll = await executeAction({ name: "scroll", target: null, args: { delta: 1000000 } });
