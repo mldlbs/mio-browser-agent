@@ -8,6 +8,7 @@ const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
 require("../llm/openai.js");
+require("../llm/anthropic.js");
 const registryMod = require("../tools/registry.js");
 global.registerTool = registryMod.registerTool;
 require("../tools/click.js");
@@ -372,6 +373,70 @@ function assertEq(got, want, name) {
   try { await adapter.generate([{ role: "user", content: "x" }]); } catch (_) { threw401 = true; }
   assert(threw401, "openai adapter throws on 401");
   assertEq(attempts, 1, "openai adapter does not retry 4xx errors");
+
+  // ── anthropic adapter ──
+  const anthropicPosted = [];
+  global.fetch = async (url, opts) => {
+    anthropicPosted.push({ url, body: JSON.parse(opts.body), headers: opts.headers });
+    return { ok: true, json: async () => ({
+      content: [
+        { type: "text", text: "我想点击" },
+        { type: "tool_use", id: "tu1", name: "click", input: { index: 1 } },
+      ],
+    }) };
+  };
+  const anthropicAdapter = adapterMod.createAdapter({ provider: "anthropic", model: "claude-x", baseURL: "https://api.anthropic.com/v1", apiKey: "ak" });
+  const anthropicOut = await anthropicAdapter.generate(
+    [
+      { role: "system", content: "You are an agent." },
+      { role: "user", content: "hi" },
+    ],
+    { tools: [{ type: "function", function: { name: "click", description: "click", parameters: { type: "object", properties: {} } } }] }
+  );
+  assertEq(anthropicOut.toolCalls[0].name, "click", "anthropic adapter parses tool_use");
+  assertEq(anthropicOut.toolCalls[0].args.index, 1, "anthropic adapter parses tool input");
+  assertEq(anthropicOut.content, "我想点击", "anthropic adapter joins text blocks");
+  const aReq = anthropicPosted[0];
+  assertEq(aReq.url, "https://api.anthropic.com/v1/messages", "anthropic posts to /v1/messages");
+  assertEq(aReq.headers["x-api-key"], "ak", "anthropic sends x-api-key");
+  assertEq(aReq.headers["anthropic-version"], "2023-06-01", "anthropic sends version header");
+  assertEq(aReq.body.system, "You are an agent.", "anthropic lifts system out of messages");
+  assertEq(aReq.body.model, "claude-x", "anthropic sends model");
+  assertEq(aReq.body.tools[0].name, "click", "anthropic converts tool to input_schema form");
+  assert(aReq.body.tools[0].input_schema, "anthropic tool has input_schema");
+  assertEq(aReq.body.messages.length, 1, "anthropic messages exclude system");
+  assertEq(aReq.body.messages[0].content[0].text, "hi", "anthropic user text wrapped in block");
+
+  // ── anthropic: assistant tool_use + tool_result round-trip ──
+  const aPosted2 = [];
+  global.fetch = async (url, opts) => { aPosted2.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ content: [{ type: "text", text: "done" }] }) }; };
+  await anthropicAdapter.generate([
+    { role: "user", content: "go" },
+    { role: "assistant", content: "", tool_calls: [{ id: "c9", type: "function", function: { name: "click", arguments: "{\"index\":2}" } }] },
+    { role: "tool", tool_call_id: "c9", content: "{\"ok\":true}" },
+  ]);
+  const aMsgs2 = aPosted2[0].messages;
+  assertEq(aMsgs2[1].role, "assistant", "anthropic assistant message present");
+  assertEq(aMsgs2[1].content[0].type, "tool_use", "anthropic tool_calls become tool_use blocks");
+  assertEq(aMsgs2[1].content[0].name, "click", "anthropic tool_use has name");
+  assertEq(aMsgs2[1].content[0].input.index, 2, "anthropic tool_use carries parsed input");
+  assertEq(aMsgs2[2].role, "user", "anthropic tool result lives in a user message");
+  assertEq(aMsgs2[2].content[0].type, "tool_result", "anthropic tool result block type");
+  assertEq(aMsgs2[2].content[0].tool_use_id, "c9", "anthropic tool_result references tool_use id");
+
+  // ── anthropic: images become base64 source blocks ──
+  const aPosted3 = [];
+  global.fetch = async (url, opts) => { aPosted3.push(JSON.parse(opts.body)); return { ok: true, json: async () => ({ content: [{ type: "text", text: "ok" }] }) }; };
+  await anthropicAdapter.generate(
+    [{ role: "user", content: "see" }],
+    { images: ["data:image/png;base64,AAAA"] }
+  );
+  const imgBlock = aPosted3[0].messages[0].content[1];
+  assertEq(imgBlock.type, "image", "anthropic image block type");
+  assertEq(imgBlock.source.type, "base64", "anthropic base64 source");
+  assertEq(imgBlock.source.media_type, "image/png", "anthropic media type parsed");
+  assertEq(imgBlock.source.data, "AAAA", "anthropic base64 data passed through");
+
   global.fetch = realFetch;
 
   // ── tools registry (pure browser actions, no finish) ──
