@@ -436,7 +436,19 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
           emit({ kind: "outcome", outcome: "exhausted" });
           return notOk("Vision confirms target not visible: " + v.reason);
         }
-        // Visible but DOM missed it: retry the snapshot once more after a beat.
+        // Vision found it AND gave coordinates: hand the agent a concrete,
+        // executable hint instead of making it re-fail DOM location. The agent
+        // can call click_at to click the exact pixel the model saw.
+        if (v.hasCoordinates) {
+          emit({ kind: "attempt", action, reason: `视觉定位成功，目标中心 (${v.x}, ${v.y})`, ok: true, attempt });
+          ctx.history.push({
+            role: "user",
+            content: `[系统] 视觉模型在页面上找到了目标元素「${targetDesc}」：目标中心坐标为 (${v.x}, ${v.y})。` +
+              `该元素未出现在 DOM 快照中。如果本步骤需要点击该目标，请用 click_at 工具传入 (${v.x}, ${v.y}) 执行点击。`,
+          });
+          return okFor;
+        }
+        // Visible but no coordinates: retry the snapshot once more after a beat.
         await sleep(600);
         emit({ kind: "attempt", action, reason: "视觉确认可见，重试快照: " + v.reason, ok: true, attempt });
         return okFor;

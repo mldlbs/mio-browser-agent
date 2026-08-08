@@ -7,7 +7,7 @@
 </head>
 <body>
   <h1>content 逻辑浏览器测试</h1>
-  <button id="btn-login" onclick="window.__clicked=(window.__clicked||0)+1">登录</button>
+  <button id="btn-login" onclick="window.__clicked=(window.__clicked||0)+1;window.__clickedAt=(window.__clickedAt||0)+1">登录</button>
   <label for="input-search">搜索</label>
   <input id="input-search" type="text" placeholder="输入关键词">
   <a id="link-home" href="#home">首页</a>

@@ -5,27 +5,40 @@
 function buildVisionPrompt(targetDesc) {
   return [
     "你正在帮助一个浏览器自动化助手。DOM 快照里找不到目标元素。",
-    "下面是当前页面的截图。请回答两个问题：",
+    "下面是当前页面的截图（截图为浏览器视口的完整尺寸）。请回答两个问题：",
     "1. 目标元素「" + targetDesc + "」是否可见地出现在页面上？",
-    "2. 如果可见，它大概在页面哪个区域（顶部/中部/底部），附近有什么文字或可点击的按钮？",
-    "如果不可见（被弹窗遮挡、需要滚动、或页面已跳转），明确说不可见并说明原因。",
+    "2. 如果可见，它的**中心点**的坐标是多少？（以图片左上角为原点，单位像素，x 向右、y 向下）",
+    "请以「x:<数字>, y:<数字>」的格式给出坐标，例如「x:512, y:360」。",
+    "如果不可见（被弹窗遮挡、需要滚动、或页面已跳转），明确说不可见并说明原因，不要编造坐标。",
     "用简洁的中文回答，不超过 3 句话。",
   ].join("\n");
 }
 
-// Parse the model's free-text answer into a structured hint.
+// Parse the model's free-text answer into a structured hint with coordinates.
 function parseVisionAnswer(text) {
   const t = (text || "").trim();
   const lower = t.toLowerCase();
-  const visible = !/(不可见|看不见|看不到|没?有找到|没?有出现|未找到|未出现|不存在|遮挡|需要滚动|已跳转|无法定位|不?再显示)/i.test(lower);
+  const invisible = /(不可见|看不见|看不到|没?有找到|没?有出现|未找到|未出现|不存在|遮挡|需要滚动|已跳转|无法定位|不?再显示|无法确定坐标|没有坐标)/i.test(lower);
+  const visible = !invisible;
+  // Extract "x:<num>, y:<num>" (or "x=<num> y=<num>") from the answer.
+  const xMatch = t.match(/\bx\s*[:=]\s*(\d+)/i);
+  const yMatch = t.match(/\by\s*[:=]\s*(\d+)/i);
+  let x = null, y = null;
+  if (xMatch && yMatch) {
+    x = parseInt(xMatch[1], 10);
+    y = parseInt(yMatch[1], 10);
+  }
   return {
     visible,
+    x,
+    y,
+    hasCoordinates: x != null && y != null && !isNaN(x) && !isNaN(y),
     reason: t.slice(0, 200),
   };
 }
 
 // Run a vision pass over the active tab. Returns a VisionResult:
-//   { ok, visible, reason, imageUsed }
+//   { ok, visible, x, y, hasCoordinates, reason, imageUsed }
 // ok=false means vision is unavailable or the capture failed.
 async function runVisionFallback({ bridge, llm, targetDesc, maxTries = 1 }) {
   try {
@@ -35,7 +48,7 @@ async function runVisionFallback({ bridge, llm, targetDesc, maxTries = 1 }) {
     const resp = await llm.generate(messages, { images: [dataUrl] });
     const answer = (resp.content || "").trim();
     const parsed = parseVisionAnswer(answer);
-    return { ok: true, visible: parsed.visible, reason: parsed.reason, imageUsed: true };
+    return { ok: true, visible: parsed.visible, x: parsed.x, y: parsed.y, hasCoordinates: parsed.hasCoordinates, reason: parsed.reason, imageUsed: true };
   } catch (e) {
     return { ok: false, visible: false, reason: (e && e.message) || String(e), imageUsed: false };
   }

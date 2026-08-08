@@ -88,6 +88,23 @@ function doClick(el, clickCount) {
   return { ok: true, value: `clicked ${el.tagName.toLowerCase()}` };
 }
 
+// Click at viewport coordinates (x, y) with a full mousedown/mouseup/click
+// sequence. Bypasses snapshot-based DOM location entirely, so it works when the
+// target exists but the locator cannot find it (dynamic/canvas/overlay content).
+// Uses elementFromPoint so the event lands on whatever the user actually sees.
+function clickAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  if (!el) return { ok: false, error: `no element at viewport (${x}, ${y})` };
+  if (el.disabled || el.getAttribute("aria-disabled") === "true" || el.getAttribute("disabled") != null) {
+    return { ok: false, error: "element at point is disabled", errorCode: "ELEMENT_DISABLED" };
+  }
+  const opts = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y };
+  el.dispatchEvent(new MouseEvent("mousedown", opts));
+  el.dispatchEvent(new MouseEvent("mouseup", opts));
+  el.dispatchEvent(new MouseEvent("click", opts));
+  return { ok: true, value: `clicked at (${x}, ${y})` };
+}
+
 async function executeAction(action) {
   const { name, target, args } = action;
   if (name === "scroll") {
@@ -105,6 +122,12 @@ async function executeAction(action) {
     const el = locateElement(target);
     if (!el) return { ok: false, error: "element not found by locator" };
     return await pasteText(el, args.text || "", args.clear);
+  }
+  if (name === "clickAt") {
+    if (typeof args.x !== "number" || typeof args.y !== "number") {
+      return { ok: false, error: "clickAt requires numeric x and y (viewport coordinates)" };
+    }
+    return clickAt(args.x, args.y);
   }
   if (name === "waitFor") {
     return waitForCondition(args || {});
@@ -322,5 +345,5 @@ function waitForCondition(args) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { executeAction, setNativeValue, setContentEditable, resolveEditable, extractPageText, pasteText, waitForCondition };
+  module.exports = { executeAction, setNativeValue, setContentEditable, resolveEditable, extractPageText, pasteText, waitForCondition, clickAt };
 }

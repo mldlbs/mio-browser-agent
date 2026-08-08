@@ -20,6 +20,7 @@ require("../tools/paste.js");
 require("../tools/read_captcha.js");
 require("../tools/tab.js");
 require("../tools/memo.js");
+require("../tools/click_at.js");
 const plannerMod = require("../sidepanel/planner.js");
 const memoryMod = require("../sidepanel/memory.js");
 const notesMod = require("../sidepanel/notes.js");
@@ -1308,6 +1309,56 @@ function assertEq(got, want, name) {
   );
   assert(!nvExec.ok, "vision disabled still fails the step");
   assert(!noVisionEvents.some((e) => e.action === "vision_locate"), "vision_locate never runs when disabled");
+
+  // ── vision coordinates: parse "x:n, y:n" and drive click_at ──
+  const parsedCoord = visionMod.parseVisionAnswer("目标在页面中部。x:512, y:360");
+  assert(parsedCoord.visible && parsedCoord.x === 512 && parsedCoord.y === 360 && parsedCoord.hasCoordinates, "vision parses coordinates");
+  const parsedNoCoord = visionMod.parseVisionAnswer("目标可见，无法确定坐标");
+  assert(!parsedNoCoord.hasCoordinates, "vision reports no coordinates when absent");
+  const parsedInvisible = visionMod.parseVisionAnswer("不可见，需要滚动");
+  assert(!parsedInvisible.visible && !parsedInvisible.hasCoordinates, "invisible answer yields no coordinates");
+
+  // ── click_at tool round-trips through the registry ──
+  const atCalls = [];
+  const atBridge = { executeAction: async (a) => { atCalls.push(a); return { ok: true, value: "clicked at " + a.args.x + "," + a.args.y }; } };
+  const atTool = registryMod.getTool("click_at");
+  assert(atTool, "click_at tool registered");
+  const atRes = await atTool.execute({ x: 100, y: 200 }, { bridge: atBridge });
+  assert(atRes.ok && atRes.value.includes("100,200"), "click_at executes with coordinates");
+  assert(atCalls[0].name === "clickAt" && atCalls[0].args.x === 100, "click_at sends clickAt action");
+  const atBad = await atTool.execute({}, { bridge: atBridge });
+  assert(!atBad.ok, "click_at rejects missing coordinates");
+
+  // ── vision recovery with coordinates hands the agent a click_at hint ──
+  const coordEvents = [];
+  const coordLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover scroll_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover vision_locate (has coords)
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 512, y: 360 })] }), // turn5 → agent clicks at coords
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了" })] }), // turn6 → done
+  ]);
+  const coordVisionLlm = { generate: async (msgs, opts) => ({ content: "目标可见。x:512, y:360" }) };
+  const coordBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
+    capture: async () => "data:image/png;base64,AAAA",
+  };
+  const coordExec = await executorMod.executeStep(
+    { description: "点不存在元素" },
+    {
+      llm: coordLlm, bridge: coordBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => coordEvents.push(ev),
+      enableVision: true, history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点不存在元素" }] }, goal: "g",
+      maxTurns: 8, maxRecoveryAttempts: 2, isStopped: () => false,
+      visionLlm: coordVisionLlm,
+    }
+  );
+  assert(coordExec.ok && coordExec.summary === "点了", "vision coordinates + click_at complete the step");
+  assert(coordEvents.some((e) => e.action === "vision_locate" && /512, 360/.test(e.reason || "")), "vision_locate event carries coordinates");
 
   // ── duplicate-click guard ──
   // An agent that tries to click the same target twice with no intervening action

@@ -59,6 +59,14 @@ const { openTab, runInPage, report } = require("./page-runner");
       const capClick = await executeAction({ name: "click", target: cap, args: {} });
       check(capClick.ok && window.__captchaClicks === 1, "executor clicks canvas captcha", capClick.ok);
 
+      // clickAt：按视口坐标点击（绕过 DOM 定位，vision 兑底链路）
+      window.__clickedAt = 0;
+      const btnRect = document.getElementById("btn-login").getBoundingClientRect();
+      const cx = Math.round(btnRect.x + btnRect.width / 2);
+      const cy = Math.round(btnRect.y + btnRect.height / 2);
+      const atRes = await executeAction({ name: "clickAt", target: null, args: { x: cx, y: cy } });
+      check(atRes.ok && window.__clickedAt === 1, "executor clicks at viewport coordinates", (atRes && atRes.error) || "");
+
       // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）
       const cctx = document.getElementById("captcha-canvas").getContext("2d");
       cctx.fillStyle = "#fff"; cctx.fillRect(0, 0, 120, 40);
