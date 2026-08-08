@@ -1135,11 +1135,14 @@ function assertEq(got, want, name) {
   assertEq(evs.attempts.length, 2, "events records all attempts");
   assertEq(evs.outcome, "exhausted", "events records final outcome");
   const rendered = revMod.renderEventStream(evs);
-  assert(rendered.includes("[步骤 3] ❌ ELEMENT_NOT_FOUND"), "render shows step + error");
+  assert(rendered.includes("[步骤 4] ❌ ELEMENT_NOT_FOUND"), "render shows 1-based step + error");
   assert(rendered.includes("✓ retry_snapshot"), "render marks successful attempt");
   assert(rendered.includes("✗ scroll_and_retry"), "render marks failed attempt");
   assert(rendered.includes("恢复用尽"), "render shows exhausted outcome");
   assertEq(revMod.renderEventStream(revMod.startEvents()), "", "empty events render empty");
+  const strIdEvs = revMod.startEvents();
+  revMod.addEvent(strIdEvs, { kind: "error", stepId: "step-a", code: "X" });
+  assert(revMod.renderEventStream(strIdEvs).includes("[步骤 step-a]"), "render keeps string step ids as-is");
 
   // scroll_and_retry: attempt 2 avoids duplicate retry_snapshot → issues scroll (delta capped at 800px)
   let scrolled = null;

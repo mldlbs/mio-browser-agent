@@ -22,7 +22,10 @@ function addEvent(events, event) {
 function renderEventStream(events) {
   if (!events || !events.errorCode) return "";
   const lines = [];
-  const step = events.stepId != null ? `[步骤 ${events.stepId}] ` : "";
+  // stepId is the 0-based plan index (or an explicit step id). Show a
+  // human-readable 1-based step number when it is a number.
+  const stepNum = typeof events.stepId === "number" && isFinite(events.stepId) ? events.stepId + 1 : events.stepId;
+  const step = stepNum != null ? `[步骤 ${stepNum}] ` : "";
   lines.push(`${step}❌ ${events.errorCode}${events.message ? ": " + events.message : ""}`);
   if (events.attempts.length) {
     lines.push("恢复:");
