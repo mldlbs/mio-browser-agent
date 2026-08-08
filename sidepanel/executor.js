@@ -244,7 +244,7 @@ async function executeStep(step, ctx) {
       // again with no successful action in between, short-circuit it instead of
       // letting the click land twice (common cause of double-submits).
       if (tc.name === "click") {
-        const key = clickTargetKey(tc.args);
+        const key = clickTargetKey(tc.args, ctx.lastSnapshot);
         if (key && key === ctx._lastClick) {
           ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ ok: false, error: "duplicate click: this element was just clicked with no action in between; do not click it again — check the page instead" }) });
           onLog("tool", `click → SKIPPED duplicate (${key})`);
@@ -319,7 +319,7 @@ async function executeStep(step, ctx) {
         // Track the last successful click target so a duplicate click in the next
         // round is short-circuited (prevents double-submitting on chat pages).
         if (tc.name === "click" && result.ok) {
-          ctx._lastClick = clickTargetKey(tc.args);
+          ctx._lastClick = clickTargetKey(tc.args, ctx.lastSnapshot);
         } else if (tc.name !== "click" && isStateChangingTool(tc.name)) {
           // Only state-changing actions (type/paste/navigate/tab) break the
           // "no intervening action" chain. Passive tools (wait, extract_text,
@@ -491,10 +491,16 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
 }
 
 // Unique key for a click target so duplicate clicks are detected across rounds.
-// Falls back to "index:" when the index is missing, or null if there is no target.
-function clickTargetKey(args) {
+// Uses the element's snapshot NAME when available (stable across re-renders —
+// a send button's index changes when new content appears, its name usually
+// does not), falling back to index or selector.
+function clickTargetKey(args, snapshot) {
   const idx = args && args.index;
-  if (typeof idx === "number") return "index:" + idx;
+  if (typeof idx === "number") {
+    const el = snapshot && snapshot.elements && snapshot.elements[idx];
+    if (el && el.name) return "name:" + el.name;
+    return "index:" + idx;
+  }
   if (args && (args.selector || args.cssPath || args.xpath)) return "sel:" + (args.selector || args.cssPath || args.xpath);
   return null;
 }

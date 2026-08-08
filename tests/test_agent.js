@@ -1623,6 +1623,46 @@ function assertEq(got, want, name) {
   assert(dupExec2.ok, "wait-interleaved clicks still complete");
   assertEq(clickCalls2.filter((n) => n === "click").length, 1, "wait does not clear the duplicate guard (second click short-circuited)");
 
+  // A re-render changes the button's INDEX but not its NAME (new message inserted
+  // above it on a chat page). The guard must still fire using the stable name.
+  // Modeled as two turns: after the first click the snapshot refreshes with the
+  // button at a different index but the same name. Element arrays are indexed
+  // consistently with their `index` field (as in real snapshots).
+  const sendBtn = (i) => ({ index: i, role: "button", name: "图标按钮(输入框下右)" });
+  let btnIndex = 3;
+  const shiftCalls = [];
+  const dupBridgeShift = {
+    snapshot: async () => {
+      const arr = [];
+      for (let k = 0; k <= btnIndex; k++) arr.push({ index: k, role: k === btnIndex ? "button" : "img", name: k === btnIndex ? "图标按钮(输入框下右)" : "image" + k });
+      return { url: "u", title: "t", elements: arr };
+    },
+    executeAction: async (a) => { shiftCalls.push(a.name); return { ok: true, value: "did " + a.name }; },
+  };
+  const dupLlmShift = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 3 })] }),
+    () => {
+      // Turn 2: the snapshot has already refreshed — the button's index moved
+      // from 3 to 7 (new content above it), name unchanged.
+      btnIndex = 7;
+      return { content: "", toolCalls: [makeToolCall("click", { index: 7 })] };
+    },
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const dupExecShift = await executorMod.executeStep(
+    { description: "点发送" },
+    {
+      llm: dupLlmShift, bridge: dupBridgeShift, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {},
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点发送" }] }, goal: "g",
+      maxTurns: 4, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(dupExecShift.ok, "re-render (index shift) step still completes");
+  assertEq(shiftCalls.filter((n) => n === "click").length, 1, "duplicate guard fires across index shift via stable name");
+
   // A state-changing action (paste) between two clicks DOES clear the guard, so
   // a later distinct click on the same target is allowed.
   const clickCalls3 = [];
