@@ -4,23 +4,22 @@
 
 function buildVisionPrompt(targetDesc) {
   return [
-    "你正在帮助一个浏览器自动化助手。DOM 快照里找不到目标元素。",
-    "下面是当前页面的截图（截图为浏览器视口的完整尺寸）。请回答两个问题：",
-    "1. 目标元素「" + targetDesc + "」是否可见地出现在页面上？",
-    "2. 如果可见，它的**中心点**的坐标是多少？（以图片左上角为原点，单位像素，x 向右、y 向下）",
-    "请以「x:<数字>, y:<数字>」的格式给出坐标，例如「x:512, y:360」。",
-    "如果不可见（被弹窗遮挡、需要滚动、或页面已跳转），明确说不可见并说明原因，不要编造坐标。",
-    "用简洁的中文回答，不超过 3 句话。",
+    "你是浏览器自动化的视觉定位器。下面是当前页面的截图（完整视口）。",
+    "请在截图中找到目标元素「" + targetDesc + "」，并给出它的**中心点坐标**。",
+    "坐标以图片左上角为原点，单位像素，x 向右、y 向下。格式必须严格为：x:<数字>, y:<数字>",
+    "例如：x:512, y:360",
+    "如果目标真的不在截图里，就回答「不可见」，不要给坐标。",
+    "只需输出一行：要么是坐标，要么是「不可见」。不要解释、不要编造坐标。",
   ].join("\n");
 }
 
 // Parse the model's free-text answer into a structured hint with coordinates.
+// A concrete "x:<num>, y:<num>" pair is the STRONG signal of visibility — it
+// overrides any incidental "遮挡/不可见" wording the model may add, since a
+// model that gives coordinates has clearly seen the element. Only a bare
+// "不可见" answer (no coordinates) counts as invisible.
 function parseVisionAnswer(text) {
   const t = (text || "").trim();
-  const lower = t.toLowerCase();
-  const invisible = /(不可见|看不见|看不到|没?有找到|没?有出现|未找到|未出现|不存在|遮挡|需要滚动|已跳转|无法定位|不?再显示|无法确定坐标|没有坐标)/i.test(lower);
-  const visible = !invisible;
-  // Extract "x:<num>, y:<num>" (or "x=<num> y=<num>") from the answer.
   const xMatch = t.match(/\bx\s*[:=]\s*(\d+)/i);
   const yMatch = t.match(/\by\s*[:=]\s*(\d+)/i);
   let x = null, y = null;
@@ -28,11 +27,17 @@ function parseVisionAnswer(text) {
     x = parseInt(xMatch[1], 10);
     y = parseInt(yMatch[1], 10);
   }
+  const hasCoordinates = x != null && y != null && !isNaN(x) && !isNaN(y);
+  if (hasCoordinates) {
+    return { visible: true, x, y, hasCoordinates: true, reason: t.slice(0, 200) };
+  }
+  const lower = t.toLowerCase();
+  const invisible = /(不可见|看不见|看不到|没?有找到|没?有出现|未找到|未出现|不存在|遮挡|需要滚动|已跳转|无法定位|不?再显示|无法确定坐标|没有坐标)/i.test(lower);
   return {
-    visible,
-    x,
-    y,
-    hasCoordinates: x != null && y != null && !isNaN(x) && !isNaN(y),
+    visible: !invisible,
+    x: null,
+    y: null,
+    hasCoordinates: false,
     reason: t.slice(0, 200),
   };
 }

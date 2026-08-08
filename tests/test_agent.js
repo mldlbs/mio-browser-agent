@@ -1528,6 +1528,10 @@ function assertEq(got, want, name) {
   assert(!parsedNoCoord.hasCoordinates, "vision reports no coordinates when absent");
   const parsedInvisible = visionMod.parseVisionAnswer("不可见，需要滚动");
   assert(!parsedInvisible.visible && !parsedInvisible.hasCoordinates, "invisible answer yields no coordinates");
+  // A model that gives coordinates has clearly SEEN the element; incidental
+  // "遮挡/不可见" wording must not override the coordinate signal.
+  const coordsWin = visionMod.parseVisionAnswer("目标被部分遮挡，不过我可以看到它。x:400, y:300");
+  assert(coordsWin.visible && coordsWin.x === 400 && coordsWin.y === 300, "coordinate pair overrides incidental occlusion wording");
 
   // ── click_at tool round-trips through the registry ──
   const atCalls = [];
