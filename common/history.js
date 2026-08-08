@@ -59,8 +59,30 @@ async function clearHistory() {
   await chrome.storage.local.remove(HISTORY_KEY);
 }
 
+// Import records from an exported JSON (array of normalized records, or a
+// single record). Merges by id: existing ids are skipped, new ids are added at
+// the front, then the list is trimmed to MAX_RECORDS. Returns the merged list.
+async function importRecords(raw) {
+  let arr = raw;
+  if (Array.isArray(raw)) arr = raw;
+  else if (raw && typeof raw === "object" && raw.id) arr = [raw];
+  if (!Array.isArray(arr)) throw new Error("导入文件不是有效的记录列表");
+  const list = await getHistory();
+  const existing = new Set(list.map((r) => r.id));
+  const incoming = [];
+  for (const item of arr) {
+    const rec = normalizeRecord(item);
+    if (!rec.id || existing.has(rec.id)) continue;
+    existing.add(rec.id);
+    incoming.push(rec);
+  }
+  const merged = incoming.concat(list).slice(0, MAX_RECORDS);
+  await chrome.storage.local.set({ [HISTORY_KEY]: merged });
+  return merged;
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, sortRecords, filterRecords, clearHistory };
+  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, sortRecords, filterRecords, clearHistory, importRecords };
 } else {
   globalThis.HistoryModule = {
     HISTORY_KEY,
@@ -72,5 +94,6 @@ if (typeof module !== "undefined") {
     sortRecords,
     filterRecords,
     clearHistory,
+    importRecords,
   };
 }

@@ -141,8 +141,9 @@ async function init() {
   $("stop").addEventListener("click", () => { if (runtime) runtime.stop(); });
   $("historyToggle").addEventListener("click", toggleHistory);
   $("historyClose").addEventListener("click", toggleHistory);
-  $("historyClear").addEventListener("click", clearHistory);
-  $("historyExport").addEventListener("click", exportHistory);
+  $("historyClear").addEventListener("click", clearHistory);                                                
+  $("historyExport").addEventListener("click", exportHistory);                                              
+  $("historyImport").addEventListener("click", importHistory);                                             
   $("historySearch").addEventListener("input", () => { _historyPage = 0; renderHistory(); });
   $("historyPrev").addEventListener("click", () => { if (_historyPage > 0) { _historyPage--; renderHistory(); } });
   $("historyNext").addEventListener("click", () => { _historyPage++; renderHistory(); });
@@ -196,6 +197,27 @@ async function exportHistory() {
   a.click();
   URL.revokeObjectURL(url);
   toast("已导出 " + records.length + " 条记录");
+}
+
+async function importHistory() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const raw = JSON.parse(text);
+      const merged = await HistoryModule.importRecords(raw);
+      _historyPage = 0;
+      renderHistory();
+      toast("已导入 " + (merged.length ? "记录" : "") + "，共 " + merged.length + " 条");
+    } catch (e) {
+      toast("导入失败: " + ((e && e.message) || String(e)));
+    }
+  };
+  input.click();
 }
 
 async function historyLog(goal) {

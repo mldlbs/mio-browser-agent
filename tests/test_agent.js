@@ -319,6 +319,23 @@ function assertEq(got, want, name) {
   const all = historyMod.filterRecords(await historyMod.getHistory(), "");
   assertEq(all.length, 2, "filterRecords empty query returns all");
   assert(all[0].pinned, "sortRecords puts pinned first");
+
+  // ── importRecords: merge exported JSON, dedupe by id, cap at MAX_RECORDS ──
+  await historyMod.addHistoryRecord({ id: "x1", goal: "既有任务", status: "done", startedAt: 5 });
+  const imp1 = await historyMod.importRecords([
+    { id: "x1", goal: "既有任务" },
+    { id: "y1", goal: "导入任务", status: "error", tags: ["迁移"] },
+  ]);
+  assert(imp1.find((r) => r.id === "y1"), "importRecords adds new record");
+  assertEq(imp1.filter((r) => r.id === "x1").length, 1, "importRecords dedupes existing id");
+  assertEq(imp1.filter((r) => r.id === "y1")[0].tags[0], "迁移", "importRecords keeps tags");
+  const impSingle = await historyMod.importRecords({ id: "z1", goal: "单条" });
+  assert(impSingle.find((r) => r.id === "z1"), "importRecords accepts a single object");
+  let impThrew = false;
+  try { await historyMod.importRecords({ not: "records" }); } catch (_) { impThrew = true; }
+  assert(impThrew, "importRecords rejects invalid payload");
+  const impBad = await historyMod.importRecords([{ no: "id" }]);
+  assert(!impBad.find((r) => !r.id), "importRecords skips records without id");
   await historyMod.clearHistory();
   delete global.chrome;
 
