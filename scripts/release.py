@@ -130,13 +130,104 @@ def api(tok, method, path, data=None, binary=None, headers=None, base="https://a
 
 
 def default_notes(version):
-    return (
-        f"## v{version}\n\n"
-        "自动打包的发布构建（zip + crx）。\n\n"
+    """Build release notes: auto-generated changelog from git history since the
+    previous version tag, with an install section appended. Falls back to a
+    minimal body when git has no tags or no commits to list."""
+    body = [f"## v{version}\n"]
+    commits = changelog_commits(version)
+    if commits:
+        body.append("### 更新内容\n")
+        body.append(commits)
+        body.append("\n")
+    else:
+        body.append("自动打包的发布构建（zip + crx）。\n")
+    body.append(
         "### 安装\n"
         "- `*.zip`：解压后 `chrome://extensions` → 开发者模式 → 加载已解压扩展\n"
         "- `*.crx`：签名包，双击安装（Chrome 提示「未列入商店」属正常，自签名扩展均如此）"
     )
+    return "\n".join(body)
+
+
+# Ordered feature buckets; unknown prefixes fall into a generic list.
+_CHANGELOG_BUCKETS = [
+    ("feat", "新功能"),
+    ("fix", "修复"),
+    ("docs", "文档"),
+    ("chore", "构建 / 工具"),
+    ("refactor", "重构"),
+    ("test", "测试"),
+]
+
+
+def _run_git(*args):
+    try:
+        out = subprocess.run(
+            ["git", "-C", REPO, *args], capture_output=True, text=True, encoding="utf-8"
+        )
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
+def _sorted_tags():
+    tags = set()
+    for line in _run_git("tag", "--list", "v*").splitlines():
+        line = line.strip()
+        if line.startswith("v") and line[1:].replace(".", "").isdigit():
+            tags.add(line)
+    return sorted(tags, key=lambda t: [int(p) for p in t[1:].split(".")])
+
+
+def previous_tag(version):
+    """Highest existing tag whose version is strictly less than `version`."""
+    cur = [int(p) for p in version.split(".")]
+    prev = None
+    for t in _sorted_tags():
+        tv = [int(p) for p in t[1:].split(".")]
+        if tv < cur:
+            prev = t
+        else:
+            break
+    return prev
+
+
+def changelog_commits(version):
+    prev = previous_tag(version)
+    if prev is None:
+        return ""
+    range_arg = f"{prev}..HEAD"
+    if not _run_git("rev-list", "-n", "1", prev):
+        return ""
+    log = _run_git("log", "--no-merges", "--format=%s", range_arg)
+    lines = [l.strip() for l in log.splitlines() if l.strip()]
+    if not lines:
+        return ""
+    buckets = {prefix: [] for prefix, _ in _CHANGELOG_BUCKETS}
+    others = []
+    for line in lines:
+        matched = False
+        for prefix, _ in _CHANGELOG_BUCKETS:
+            # match "prefix: msg" or "prefix(scope): msg" — conventional commits
+            if not (line.startswith(prefix + ":") or line.startswith(prefix + "(")):
+                continue
+            col = line.find(":")
+            msg = line[col + 1:].strip() if col >= 0 else ""
+            if msg:
+                buckets[prefix].append(msg)
+                matched = True
+                break
+        if not matched:
+            others.append(line)
+    parts = []
+    for prefix, label in _CHANGELOG_BUCKETS:
+        if buckets[prefix]:
+            parts.append(f"**{label}**")
+            parts.extend(f"- {m}" for m in buckets[prefix])
+    if others:
+        parts.append("**其他**")
+        parts.extend(f"- {m}" for m in others)
+    return "\n".join(parts)
 
 
 def main():
@@ -163,6 +254,7 @@ def main():
     crx_path, crx_len, crx_id = build_crx(zip_path, args.pem, os.path.join(out_dir, f"mio-browser-agent-v{version}.crx"))
     print(f"crx: {crx_path} ({crx_len} bytes, id {crx_id})")
 
+    _run_git("fetch", "origin", "--tags", "--force")
     notes = default_notes(version)
     if args.notes_file:
         with open(args.notes_file, encoding="utf-8") as f:
