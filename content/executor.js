@@ -211,7 +211,9 @@ function matchFieldToControl(fieldKey, controls) {
   let bestQ = 0;
   for (const c of controls) {
     const m = matchField(fieldKey, { name: c.name, placeholder: c.placeholder, role: c.role, value: c.value });
-    const score = m.quality === "exact" ? 3 : m.quality === "synonym" ? 2 : 0;
+    // Prefer the most specific match: exact > synonym, and among synonyms the
+    // one with the longest (most specific) synonym text wins.
+    const score = m.quality === "exact" ? 3 : m.quality === "synonym" ? 2 + ((m.synonymLen || 0) / 100) : 0;
     if (score > bestQ) { bestQ = score; best = c; }
   }
   return best;
@@ -219,7 +221,16 @@ function matchFieldToControl(fieldKey, controls) {
 
 function setCheckboxControl(el, checked) {
   if (typeof el.checked !== "boolean") return { ok: false, error: `not a checkbox: <${el.tagName.toLowerCase()}>` };
-  el.checked = !!checked;
+  // Use the native prototype setter: React-controlled checkboxes track their
+  // checked state via a value-tracking hook and ignore plain `el.checked = x`.
+  // Going through the prototype setter (like setNativeValue) lets React's own
+  // value tracker observe the change and sync its state.
+  const proto = el.tagName === "INPUT" ? HTMLInputElement.prototype : null;
+  if (proto && Object.getOwnPropertyDescriptor(proto, "checked") && Object.getOwnPropertyDescriptor(proto, "checked").set) {
+    Object.getOwnPropertyDescriptor(proto, "checked").set.call(el, !!checked);
+  } else {
+    el.checked = !!checked;
+  }
   el.dispatchEvent(new Event("input", { bubbles: true }));
   el.dispatchEvent(new Event("change", { bubbles: true }));
   return { ok: true };
@@ -228,6 +239,7 @@ function setCheckboxControl(el, checked) {
 function selectOptionByText(el, text) {
   const want = String(text).trim();
   if (!el.options || el.options.length === 0) return { ok: false, error: "select has no options" };
+  if (!want) return { ok: false, error: "empty option text is a placeholder, refusing to select" };
   const opts = Array.from(el.options);
   let idx = opts.findIndex((o) => o.text.trim() === want);
   if (idx < 0) idx = opts.findIndex((o) => o.text.trim().includes(want));
@@ -260,9 +272,14 @@ function fillFormField(control, value) {
 }
 
 const SUBMIT_KEYWORDS_STRONG = ["登录", "注册", "提交", "确定", "sign in", "signin", "submit", "下一步", "继续", "立即"];
-const SUBMIT_KEYWORDS_WEAK = ["发送", "完成", "保存", "ok"];
+const SUBMIT_KEYWORDS_WEAK = ["发送", "完成", "保存"];
 
-function findSubmitButton(controls) {
+function findSubmitButton(controls, formEl) {
+  if (formEl) {
+    const inForm = Array.from(formEl.querySelectorAll("button[type='submit'], input[type='submit']"))
+      .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+    if (inForm.length) return inForm[0];
+  }
   const native = Array.from(document.querySelectorAll("form button[type='submit'], form input[type='submit']"))
     .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
   if (native.length) return native[0];
@@ -304,9 +321,11 @@ async function formFill(args) {
   const errors = [];
   let anyFilled = false;
   const missing = [];
+  const matchedForms = new Set();
   for (const key of keys) {
     const control = matchFieldToControl(key, controls);
     if (!control) { perField[key] = "not_found"; missing.push(key); continue; }
+    if (control.el.form) matchedForms.add(control.el.form);
     const value = fields[key];
     let res;
     if (typeof value === "object" && value !== null && "select" in value) {
@@ -330,7 +349,8 @@ async function formFill(args) {
   const summary = { ok: true, fields: perField, filled: keys.filter((k) => perField[k] === "filled").length, total: keys.length };
   let submitRes = { ok: true, submitted: false };
   if (args0.submit) {
-    const btn = findSubmitButton(controls);
+    const formEl = matchedForms.size === 1 ? matchedForms.values().next().value : null;
+    const btn = findSubmitButton(controls, formEl);
     if (btn) {
       const r = doClick(btn, 1);
       submitRes = { ok: r.ok, submitted: r.ok, button: computeAccessibleName(btn) };
@@ -539,5 +559,5 @@ function waitForCondition(args) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { executeAction, setNativeValue, setContentEditable, resolveEditable, extractPageText, pasteText, waitForCondition, clickAt };
+  module.exports = { executeAction, setNativeValue, setContentEditable, resolveEditable, extractPageText, pasteText, waitForCondition, clickAt, formFill, collectFormControls, findSubmitButton, setCheckboxControl, selectOptionByText, matchFieldToControl };
 }

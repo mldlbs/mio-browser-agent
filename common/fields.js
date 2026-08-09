@@ -35,6 +35,19 @@ function tokenBoundaryExact(key, name, ph) {
   return re.test(name) || re.test(ph);
 }
 
+// CJK has no spaces; a synonym that sits inside another word ("搜" inside
+// "商品搜罗") is a substring accident, not a label match. Require the synonym to
+// start/end at a boundary that is not another CJK character (start/end of text,
+// or adjacent to punctuation/whitespace/latin).
+function cjkBoundaryHit(hay, needle) {
+  if (!hay.includes(needle)) return false;
+  const idx = hay.indexOf(needle);
+  const before = idx === 0 ? "" : hay[idx - 1];
+  const after = idx + needle.length >= hay.length ? "" : hay[idx + needle.length];
+  const cjk = /[\u4e00-\u9fff]/;
+  return !(cjk.test(before) && cjk.test(after));
+}
+
 function matchField(fieldKey, el) {
   if (!fieldKey || !el) return { quality: "none", fieldKey };
   if (!ROLE_FIELDS.has(el.role)) return { quality: "none", fieldKey };
@@ -48,10 +61,14 @@ function matchField(fieldKey, el) {
   if (!Object.prototype.hasOwnProperty.call(FIELD_SYNONYMS, fieldKey)) {
     return { quality: "none", fieldKey };
   }
+  let bestLen = 0;
   for (const s of FIELD_SYNONYMS[fieldKey]) {
     const n = normalizeText(s);
-    if (name.includes(n) || ph.includes(n)) return { quality: "synonym", fieldKey };
+    if (cjkBoundaryHit(name, n) || cjkBoundaryHit(ph, n)) {
+      if (n.length > bestLen) bestLen = n.length;
+    }
   }
+  if (bestLen > 0) return { quality: "synonym", fieldKey, synonymLen: bestLen };
   return { quality: "none", fieldKey };
 }
 

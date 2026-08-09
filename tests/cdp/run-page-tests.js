@@ -54,6 +54,25 @@ const { openTab, runInPage, report } = require("./page-runner");
       check(!ffMiss.ok && ffMiss.errorCode === "FIELD_NOT_FOUND", "form_fill reports FIELD_NOT_FOUND", JSON.stringify(ffMiss));
       check(ffUser.value === "bob", "form_fill keeps filled fields on partial failure", ffUser.value);
 
+      // {select:""} placeholder value is refused, not selected
+      ffCity.selectedIndex = 0;
+      const ffEmptySel = await executeAction({ name: "form_fill", target: null, args: { fields: { city: { select: "" } } } });
+      check(!ffEmptySel.ok && String(ffEmptySel.error).includes("placeholder"), "form_fill refuses empty select value", JSON.stringify(ffEmptySel));
+      check(ffCity.selectedIndex === 0, "form_fill empty select keeps placeholder", ffCity.value);
+
+      // submit stays in the filled form's scope: filling login-form must NOT
+      // click second-form's submit button even though it appears later in DOM.
+      window.__ffSubmitted = 0; window.__ffSubmitted2 = 0;
+      const ffScope = await executeAction({ name: "form_fill", target: null, args: { fields: { username: "scoped" }, submit: true } });
+      check(ffScope.ok && window.__ffSubmitted === 1, "form_fill submit scoped to the filled form", JSON.stringify(ffScope));
+      check(window.__ffSubmitted2 === 0, "form_fill does not click the other form's submit", String(window.__ffSubmitted2));
+
+      // weak keyword "ok" no longer triggers submit: second-form has an "OK"
+      // button (type=button, not submit). Filling it must use the native submit.
+      window.__ffSubmitted2 = 0;
+      const ffOk = await executeAction({ name: "form_fill", target: null, args: { fields: { email: "a@b.com" }, submit: true } });
+      check(ffOk.ok && window.__ffSubmitted2 === 1, "form_fill uses native submit, not the OK button", JSON.stringify(ffOk));
+
       // Shadow DOM：open shadow root 内元素可快照 + 定位 + 点击
       const sbtn = snap.elements.find((e) => e.name.includes("幽灵按钮"));
       check(!!sbtn && sbtn.shadowPath.length >= 1, "snapshot finds button inside open shadow root", sbtn && JSON.stringify(sbtn.shadowPath));

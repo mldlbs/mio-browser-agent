@@ -1,4 +1,4 @@
-const protocol = require("../common/protocol.js");
+﻿const protocol = require("../common/protocol.js");
 const snapshotMod = require("../content/snapshot.js");
 const contentExecMod = require("../content/executor.js");
 const locatorMod = require("../content/locator.js");
@@ -100,6 +100,9 @@ function assertEq(got, want, name) {
   assertEq(ff("username", { name: "", placeholder: "", role: "textbox" }).quality, "none", "matchField: empty name+placeholder no match");
   assertEq(ff("__proto__", { name: "用户名", placeholder: "", role: "textbox" }).quality, "none", "matchField: prototype-inherited key does not crash");
   assertEq(ff("constructor", { name: "用户名", placeholder: "", role: "textbox" }).quality, "none", "matchField: constructor key does not crash");
+  assertEq(ff("search", { name: "商品搜罗", placeholder: "", role: "textbox" }).quality, "none", "matchField: single-char CJK synonym does not hit compound words");
+  assertEq(ff("search", { name: "搜索框", placeholder: "", role: "textbox" }).quality, "synonym", "matchField: single-char CJK synonym still matches real labels");
+  assert(ff("confirm", { name: "确认密码", placeholder: "", role: "textbox" }).synonymLen > ff("password", { name: "确认密码", placeholder: "", role: "textbox" }).synonymLen, "matchField: longer synonym is more specific for 确认密码");
 
   const snap = { url: "https://x.com", title: "X", elements: [
     { index: 0, role: "button", name: "登录", value: "", boundingBox: { x: 1, y: 2, w: 3, h: 4 } },
@@ -1363,6 +1366,148 @@ function assertEq(got, want, name) {
   const ffBad = await ffTool.execute({}, ffCtx);
   assert(!ffBad.ok, "form_fill without fields fails");
 
+  // ── content-side form_fill: mock DOM environment ──
+  const savedGlobal = global.document;
+  const savedEvent = global.Event;
+  const savedMouseEvent = global.MouseEvent;
+  const savedPointerEvent = global.PointerEvent;
+  const savedWindow = global.window;
+  const savedComputeName = global.computeAccessibleName;
+  const savedComputeRole = global.computeRole;
+  const savedMatchField = global.matchField;
+  global.Event = function (type) { this.type = type; };
+  global.MouseEvent = function (type) { this.type = type; };
+  global.PointerEvent = function (type) { this.type = type; };
+  global.window = { innerWidth: 1920, innerHeight: 1080 };
+  global.computeAccessibleName = snapshotMod.computeAccessibleName;
+  global.computeRole = snapshotMod.computeRole;
+  global.matchField = fieldsMod.matchField;
+
+  function mockFormEl(opts) {
+    const el = {
+      tagName: opts.tagName || "INPUT",
+      type: opts.type || "",
+      name: opts.name || "",
+      placeholder: opts.placeholder || "",
+      checked: !!opts.checked,
+      value: opts.value || "",
+      selectedIndex: opts.selectedIndex || 0,
+      disabled: false,
+      options: opts.options || [],
+      form: opts.form || null,
+      offsetParent: opts.offsetParent === undefined ? {} : opts.offsetParent,
+      getClientRects: () => [{ width: 10, height: 10 }],
+      getBoundingClientRect: () => ({ x: opts.x || 0, y: opts.y || 0, width: 10, height: 10 }),
+      getAttribute: (k) => (k === "disabled" || k === "aria-disabled" ? null : null),
+      dispatchEvent: () => {},
+      click: function () { this.__clicked = (this.__clicked || 0) + 1; },
+      _events: [],
+    };
+    Object.defineProperty(el, "value", {
+      configurable: true, writable: true, value: opts.value || "",
+    });
+    return el;
+  }
+  function mockForm(elements) {
+    const f = {
+      tagName: "FORM", elements,
+      querySelectorAll: (sel) => {
+        if (sel.includes("type='submit'") && f.__submitBtn) return [f.__submitBtn];
+        return [];
+      },
+    };
+    elements.forEach((e) => { e.form = f; });
+    return f;
+  }
+  function setupFormFillDom(selMap) {
+    global.document = { querySelectorAll: (sel) => selMap[sel] || [] };
+  }
+
+  // scenario 1: React-controlled checkbox uses the native prototype setter.
+  {
+    const proto = global.HTMLInputElement.prototype;
+    let setterCalls = 0;
+    const savedCheckedDesc = Object.getOwnPropertyDescriptor(proto, "checked");
+    Object.defineProperty(proto, "checked", {
+      configurable: true,
+      set(v) { setterCalls++; Object.defineProperty(this, "checked", { value: v, configurable: true, writable: true }); },
+      get() { return this._checked; },
+    });
+    const cb = mockFormEl({ tagName: "INPUT", type: "checkbox", name: "agree", checked: false });
+    Object.defineProperty(cb, "checked", { configurable: true, value: false, writable: true });
+    const r = contentExecMod.setCheckboxControl(cb, true);
+    assert(r.ok && setterCalls === 1, "setCheckboxControl goes through native setter", JSON.stringify({ r, setterCalls }));
+    assert(cb.checked === true, "setCheckboxControl sets checked state");
+    if (savedCheckedDesc) Object.defineProperty(proto, "checked", savedCheckedDesc);
+    else delete proto.checked;
+  }
+
+  // scenario 2: {select:""} placeholder value is refused, not selected.
+  {
+    const sel = mockFormEl({
+      tagName: "SELECT", name: "city",
+      options: [{ text: "请选择城市", value: "" }, { text: "上海", value: "sh" }],
+      selectedIndex: 0,
+    });
+    const r = contentExecMod.selectOptionByText(sel, "");
+    assert(!r.ok && String(r.error).includes("placeholder"), "selectOptionByText refuses empty text", JSON.stringify(r));
+    assert(sel.selectedIndex === 0, "empty select keeps placeholder selected");
+  }
+
+  // scenario 3: submit stays in the filled form's scope (two forms on page).
+  {
+    const fA = mockForm([
+      mockFormEl({ tagName: "INPUT", type: "text", name: "username", placeholder: "用户名" }),
+      mockFormEl({ tagName: "INPUT", type: "password", name: "password", placeholder: "密码" }),
+    ]);
+    const fB = mockForm([mockFormEl({ tagName: "INPUT", type: "text", name: "email", placeholder: "邮箱" })]);
+    const btnA = mockFormEl({ tagName: "BUTTON", type: "submit", form: fA });
+    const btnB = mockFormEl({ tagName: "BUTTON", type: "submit", form: fB });
+    btnA.__clicked = 0; btnB.__clicked = 0;
+    fA.__submitBtn = btnA; fB.__submitBtn = btnB;
+    const controls = [
+      { el: fA.elements[0], role: "textbox", name: "用户名", placeholder: "用户名", value: "" },
+      { el: fA.elements[1], role: "textbox", name: "密码", placeholder: "密码", value: "" },
+    ];
+    const btn = contentExecMod.findSubmitButton(controls, fA);
+    assert(btn === btnA, "findSubmitButton prefers the filled form's submit button");
+  }
+
+  // scenario 4: weak keyword "ok" no longer triggers submit.
+  {
+    const okBtn = mockFormEl({ tagName: "BUTTON", type: "button", name: "OK" });
+    okBtn.__clicked = 0;
+    setupFormFillDom({});
+    global.document.querySelectorAll = (sel) => (sel.startsWith("form button") ? [] : [okBtn]);
+    // reuse executor constant indirectly: build controls so fieldCount >= 2 but
+    // weak keywords exclude "ok" now — the only button is "OK", so no submit.
+    const controls = [
+      { el: mockFormEl({ name: "a" }), role: "textbox", name: "a", placeholder: "", value: "" },
+      { el: mockFormEl({ name: "b" }), role: "textbox", name: "b", placeholder: "", value: "" },
+    ];
+    const btn = contentExecMod.findSubmitButton(controls, null);
+    assert(btn === null, "findSubmitButton does not treat OK as a weak submit keyword");
+  }
+
+  // scenario 5: matchFieldToControl prefers the more specific synonym.
+  {
+    const controls = [
+      { el: mockFormEl({ name: "password", placeholder: "" }), role: "textbox", name: "密码", placeholder: "", value: "" },
+      { el: mockFormEl({ name: "confirm_password", placeholder: "" }), role: "textbox", name: "确认密码", placeholder: "", value: "" },
+    ];
+    const pw = contentExecMod.matchFieldToControl("password", controls);
+    assert(pw === controls[0], "password maps to the bare 密码 field, not 确认密码");
+  }
+
+  global.document = savedGlobal;
+  global.Event = savedEvent;
+  global.MouseEvent = savedMouseEvent;
+  global.PointerEvent = savedPointerEvent;
+  global.window = savedWindow;
+  global.computeAccessibleName = savedComputeName;
+  global.computeRole = savedComputeRole;
+  global.matchField = savedMatchField;
+
   // ── type tool: field parameter locates a snapshot element semantically ──
   const typeBridge = {
     executeAction: async (action) => {
@@ -2062,3 +2207,5 @@ function assertEq(got, want, name) {
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
+
+
