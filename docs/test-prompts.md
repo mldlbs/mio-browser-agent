@@ -284,6 +284,50 @@
 
 ---
 
+## 🖼️ 场景七：跨域 iframe（扩展层真机验证）
+
+**验证点**：`getAllFrames` 枚举跨域 frame、按 `frameId` 路由 snapshot 与动作、iframe 内元素可操作。
+
+> 同源 iframe（framePath 定位）已被 CDP 测试覆盖；跨域 iframe（如 Gmail 富文本、嵌入表单）走 `getAllFrames` + `frameId` 路由，需在扩展运行时真机验证。
+
+### 任务 1 · 基础（含 iframe 的普通页面）
+
+```
+打开一个包含 iframe 的页面（如 https://www.w3schools.com/html/html_iframe.asp，或任意含嵌入内容的站），找到 iframe 内的一个可点击元素并点击它。
+```
+
+**期望行为**：`snapshot` 收集 iframe 元素（带 frameId）→ 定位 → 按 frameId 路由点击。
+
+**验收标准**
+
+| 项 | 通过条件 |
+|----|----------|
+| 快照 | iframe 内元素出现在快照（debug 显示 element 带 frameId） |
+| 操作 | 能定位并点击 iframe 内元素 |
+| 结果 | 点击生效（iframe 内容响应） |
+
+**失败信号**：iframe 元素缺失、定位到主 frame 的错元素、点击后 iframe 无响应。
+
+### 任务 2 · 进阶（嵌入表单）
+
+```
+打开一个含嵌入表单 iframe 的页面（如 Google Forms 嵌入页，或任意用 iframe 嵌表单的站），在 iframe 内的输入框输入一段文字，并提交。
+```
+
+**期望行为**：`snapshot` 收集 iframe 输入框 → `type` 按 frameId 路由 → 提交。
+
+**验收标准**
+
+| 项 | 通过条件 |
+|----|----------|
+| 定位 | iframe 内输入框被快照收录并可定位 |
+| 输入 | 文字正确填入 iframe 输入框 |
+| 提交 | 提交动作到达 iframe 表单 |
+
+**失败信号**：iframe 输入框无法定位、输入落空、提交无反应、报「无法与页面通信」。
+
+---
+
 ## 📋 回归速查表
 
 | 场景 | 任务 | 核心验证点 | 优先级 |
@@ -300,6 +344,8 @@
 | 跨站+memo | 2 replan 后 memo 保留 | replan 不丢数据 | ⭐⭐⭐⭐ |
 | 视觉兜底 | 1 canvas 坐标点击 | vision_locate+click_at | ⭐⭐⭐ |
 | 视觉兜底 | 2 无坐标降级 | 不可见诚实失败 | ⭐⭐⭐ |
+| 跨域 iframe | 1 iframe 点击 | getAllFrames+frameId 路由 | ⭐⭐⭐⭐ |
+| 跨域 iframe | 2 iframe 表单输入 | frameId 路由+输入提交 | ⭐⭐⭐⭐ |
 
 ---
 
