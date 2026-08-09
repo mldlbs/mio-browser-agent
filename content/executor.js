@@ -95,6 +95,10 @@ function doClick(el, clickCount) {
 // Also dispatches pointerdown/pointerup: modern UIs (React, web components)
 // often listen for pointer events, not mouse events.
 function clickAt(x, y) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (x < 0 || y < 0 || x >= vw || y >= vh) {
+    return { ok: false, error: `坐标 (${x}, ${y}) 超出视口 (${vw}x${vh})——目标可能被滚动离开，或坐标来自滚动前的旧截图。请重新定位（find_by_vision）并立即点击，不要先滚动。`, errorCode: "CLICK_OUT_OF_VIEWPORT" };
+  }
   const el = document.elementFromPoint(x, y);
   if (!el) return { ok: false, error: `no element at viewport (${x}, ${y})` };
   if (el.disabled || el.getAttribute("aria-disabled") === "true" || el.getAttribute("disabled") != null) {

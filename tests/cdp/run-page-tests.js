@@ -66,6 +66,10 @@ const { openTab, runInPage, report } = require("./page-runner");
       const cy = Math.round(btnRect.y + btnRect.height / 2);
       const atRes = await executeAction({ name: "clickAt", target: null, args: { x: cx, y: cy } });
       check(atRes.ok && window.__clickedAt === 1, "executor clicks at viewport coordinates", (atRes && atRes.error) || "");
+      // Out-of-viewport coordinates return CLICK_OUT_OF_VIEWPORT, not a silent miss.
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const outRes = await executeAction({ name: "clickAt", target: null, args: { x: vw + 500, y: vh + 500 } });
+      check(!outRes.ok && outRes.errorCode === "CLICK_OUT_OF_VIEWPORT", "clickAt reports out-of-viewport coords", (outRes && outRes.error) || "");
 
       // vision-fallback target: visible+clickable but EXCLUDED from the snapshot
       // (no onclick/role/button tag), so the vision_locate path must find it by sight.
