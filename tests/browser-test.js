@@ -39,6 +39,23 @@
   const edRes = executeAction({ name: "type", target: ed, args: { text: "x", clear: true } });
   check(edRes.ok && document.getElementById("box-editor").textContent === "x", "executor types into contenteditable");
 
+  // form_fill: one call fills text/select/checkbox and can submit
+  const ffFields = { username: "alice", password: "s3cret", city: { select: "上海" }, agree: true };
+  const ffRes = executeAction({ name: "form_fill", target: null, args: { fields: ffFields, submit: false } });
+  const ffUser = document.getElementById("ff-username");
+  const ffPass = document.getElementById("ff-password");
+  const ffCity = document.getElementById("ff-city");
+  const ffAgree = document.getElementById("ff-agree");
+  check(ffRes.ok, "form_fill returns ok", JSON.stringify(ffRes));
+  check(ffUser.value === "alice", "form_fill fills username", ffUser.value);
+  check(ffPass.value === "s3cret", "form_fill fills password", ffPass.value);
+  check(ffCity.selectedIndex === 1 && ffCity.options[1].text === "上海", "form_fill selects city by option text", ffCity.value);
+  check(ffAgree.checked === true, "form_fill checks checkbox", String(ffAgree.checked));
+  // missing field key → FIELD_NOT_FOUND, already-filled retained
+  const ffMiss = executeAction({ name: "form_fill", target: null, args: { fields: { nosuchkey: "x", username: "bob" } } });
+  check(!ffMiss.ok && ffMiss.errorCode === "FIELD_NOT_FOUND", "form_fill reports FIELD_NOT_FOUND for unknown key", JSON.stringify(ffMiss));
+  check(ffUser.value === "bob", "form_fill keeps successfully-filled fields on partial failure", ffUser.value);
+
   const fail = results.filter((c) => !c).length;
   const final = document.createElement("div");
   final.textContent = fail === 0 ? "=== ALL PASS ===" : fail + " FAILURE(S)";

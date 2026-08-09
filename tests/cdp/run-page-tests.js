@@ -39,6 +39,21 @@ const { openTab, runInPage, report } = require("./page-runner");
       const edAppend = await executeAction({ name: "type", target: ed, args: { text: "abc", clear: false } });
       check(edAppend.ok && document.getElementById("box-editor").textContent === "xabc", "executor appends to contenteditable");
 
+      // form_fill: batch fill + submit in one call
+      const ffFields = { username: "alice", password: "s3cret", city: { select: "上海" }, agree: true };
+      const ffRes = await executeAction({ name: "form_fill", target: null, args: { fields: ffFields, submit: true } });
+      const ffUser = document.getElementById("ff-username");
+      const ffPass = document.getElementById("ff-password");
+      const ffCity = document.getElementById("ff-city");
+      const ffAgree = document.getElementById("ff-agree");
+      check(ffRes.ok && ffUser.value === "alice" && ffPass.value === "s3cret", "form_fill fills text fields", JSON.stringify(ffRes));
+      check(ffCity.selectedIndex === 1 && ffCity.options[1].text === "上海", "form_fill selects by option text", ffCity.value);
+      check(ffAgree.checked === true, "form_fill checks checkbox", String(ffAgree.checked));
+      check(window.__ffSubmitted === 1, "form_fill submit clicked the submit button", String(window.__ffSubmitted));
+      const ffMiss = await executeAction({ name: "form_fill", target: null, args: { fields: { nosuchkey: "x", username: "bob" } } });
+      check(!ffMiss.ok && ffMiss.errorCode === "FIELD_NOT_FOUND", "form_fill reports FIELD_NOT_FOUND", JSON.stringify(ffMiss));
+      check(ffUser.value === "bob", "form_fill keeps filled fields on partial failure", ffUser.value);
+
       // Shadow DOM：open shadow root 内元素可快照 + 定位 + 点击
       const sbtn = snap.elements.find((e) => e.name.includes("幽灵按钮"));
       check(!!sbtn && sbtn.shadowPath.length >= 1, "snapshot finds button inside open shadow root", sbtn && JSON.stringify(sbtn.shadowPath));

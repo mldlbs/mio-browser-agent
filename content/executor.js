@@ -156,6 +156,9 @@ async function executeAction(action) {
   if (name === "waitFor") {
     return waitForCondition(args || {});
   }
+  if (name === "form_fill") {
+    return await formFill(args);
+  }
   let el = locateElement(target);
   if (!el) return { ok: false, error: "element not found by locator" };
   if (name === "click") {
@@ -181,6 +184,164 @@ async function executeAction(action) {
     return { ok: true, value: `typed into ${target.name}` };
   }
   return { ok: false, error: `unknown action: ${name}` };
+}
+
+// ── form_fill: batch-fill a form from semantic field keys ──
+function collectFormControls() {
+  const all = Array.from(document.querySelectorAll(
+    "input, textarea, select, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='checkbox'], [role='radio']"
+  ));
+  const visible = all.filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+  return visible.map((el) => {
+    const role = (typeof computeRole === "function") ? computeRole(el) : (el.tagName === "SELECT" ? "combobox" : "textbox");
+    return { el, role, name: computeAccessibleName(el), placeholder: el.getAttribute("placeholder") || "", value: elementValue(el) };
+  });
+}
+
+function elementValue(el) {
+  if (el.tagName === "SELECT") {
+    const sel = el.options[el.selectedIndex];
+    return sel ? sel.text : "";
+  }
+  return el.value || "";
+}
+
+function matchFieldToControl(fieldKey, controls) {
+  let best = null;
+  let bestQ = 0;
+  for (const c of controls) {
+    const m = matchField(fieldKey, { name: c.name, placeholder: c.placeholder, role: c.role, value: c.value });
+    const score = m.quality === "exact" ? 3 : m.quality === "synonym" ? 2 : 0;
+    if (score > bestQ) { bestQ = score; best = c; }
+  }
+  return best;
+}
+
+function setCheckboxControl(el, checked) {
+  if (typeof el.checked !== "boolean") return { ok: false, error: `not a checkbox: <${el.tagName.toLowerCase()}>` };
+  el.checked = !!checked;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return { ok: true };
+}
+
+function selectOptionByText(el, text) {
+  const want = String(text).trim();
+  if (!el.options || el.options.length === 0) return { ok: false, error: "select has no options" };
+  const opts = Array.from(el.options);
+  let idx = opts.findIndex((o) => o.text.trim() === want);
+  if (idx < 0) idx = opts.findIndex((o) => o.text.trim().includes(want));
+  if (idx < 0) {
+    const avail = opts.map((o) => o.text.trim()).filter(Boolean).slice(0, 20).join(", ");
+    return { ok: false, error: `option "${want}" not found (available: ${avail || "none"})` };
+  }
+  el.selectedIndex = idx;
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  return { ok: true, value: opts[idx].text.trim() };
+}
+
+function fillFormField(control, value) {
+  const el = control.el;
+  if (control.role === "checkbox" || control.role === "radio") {
+    return setCheckboxControl(el, !!value);
+  }
+  if (control.role === "combobox" || el.tagName === "SELECT") {
+    return selectOptionByText(el, value);
+  }
+  const editable = resolveEditable(el);
+  if (!editable) return { ok: false, error: `no editable element for <${el.tagName.toLowerCase()}>` };
+  if (editable.isContentEditable) {
+    return setContentEditable(editable, String(value), true).then(() => ({ ok: true }));
+  }
+  const cleared = setNativeValue(editable, "");
+  if (!cleared.ok) return cleared;
+  return setNativeValue(editable, String(value));
+}
+
+const SUBMIT_KEYWORDS_STRONG = ["登录", "注册", "提交", "确定", "sign in", "signin", "submit", "下一步", "继续", "立即"];
+const SUBMIT_KEYWORDS_WEAK = ["发送", "完成", "保存", "ok"];
+
+function findSubmitButton(controls) {
+  const native = Array.from(document.querySelectorAll("form button[type='submit'], form input[type='submit']"))
+    .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+  if (native.length) return native[0];
+  const buttons = Array.from(document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button']"))
+    .filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
+  const nameOf = (el) => computeAccessibleName(el).toLowerCase();
+  const strong = buttons.filter((el) => SUBMIT_KEYWORDS_STRONG.some((k) => nameOf(el).includes(k.toLowerCase())));
+  if (strong.length) {
+    return strong.reduce((a, b) => (distToNearestControl(b, controls) < distToNearestControl(a, controls) ? b : a));
+  }
+  const fieldCount = controls.filter((c) => c.role === "textbox" || c.role === "combobox").length;
+  if (fieldCount >= 2) {
+    const weak = buttons.filter((el) => SUBMIT_KEYWORDS_WEAK.some((k) => nameOf(el).includes(k)));
+    if (weak.length) return weak.reduce((a, b) => (distToNearestControl(b, controls) < distToNearestControl(a, controls) ? b : a));
+  }
+  return null;
+}
+
+function distToNearestControl(buttonEl, controls) {
+  const r = buttonEl.getBoundingClientRect();
+  const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+  let best = Infinity;
+  for (const c of controls) {
+    if (!c.el.getBoundingClientRect) continue;
+    const b = c.el.getBoundingClientRect();
+    const d = Math.hypot(cx - (b.x + b.width / 2), cy - (b.y + b.height / 2));
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+async function formFill(args) {
+  const fields = args.fields || {};
+  const keys = Object.keys(fields);
+  if (!keys.length) return { ok: false, error: "form_fill requires a non-empty fields object" };
+  const controls = collectFormControls();
+  const perField = {};
+  let anyFilled = false;
+  const missing = [];
+  for (const key of keys) {
+    const control = matchFieldToControl(key, controls);
+    if (!control) { perField[key] = "not_found"; missing.push(key); continue; }
+    const value = fields[key];
+    let res;
+    if (typeof value === "object" && value !== null && "select" in value) {
+      res = selectOptionByText(control.el, value.select);
+    } else if (typeof value === "boolean") {
+      res = setCheckboxControl(control.el, value);
+    } else if (control.role === "checkbox" || control.role === "radio") {
+      res = setCheckboxControl(control.el, !!value);
+    } else if (control.role === "combobox" || control.el.tagName === "SELECT") {
+      res = selectOptionByText(control.el, value);
+    } else {
+      res = await fillFormField(control, value);
+    }
+    if (res.ok) { perField[key] = "filled"; anyFilled = true; }
+    else { perField[key] = "error"; missing.push(key); }
+  }
+  const summary = { ok: true, fields: perField, filled: keys.filter((k) => perField[k] === "filled").length, total: keys.length };
+  let submitRes = { ok: true, submitted: false };
+  if (args.submit) {
+    const btn = findSubmitButton(controls);
+    if (btn) {
+      const r = doClick(btn, 1);
+      submitRes = { ok: r.ok, submitted: true, button: computeAccessibleName(btn) };
+    } else {
+      submitRes = { ok: false, submitted: false, error: "no submit button found (agent should click manually)", errorCode: "SUBMIT_NOT_FOUND" };
+    }
+  }
+  if (!anyFilled && missing.length === keys.length) {
+    return { ok: false, error: `no fields could be matched (missing: ${missing.join(", ")})`, errorCode: "FIELD_NOT_FOUND", fields: perField, submit: submitRes };
+  }
+  if (missing.length) {
+    return { ok: false, error: `fields not matched: ${missing.join(", ")}`, errorCode: "FIELD_NOT_FOUND", fields: perField, submit: submitRes };
+  }
+  if (args.submit && !submitRes.ok) {
+    return { ok: false, ...submitRes, fields: perField };
+  }
+  return { ok: true, ...summary, submit: submitRes };
 }
 
 // Read the exact bitmap of a captcha canvas/img element as a PNG data URL. A

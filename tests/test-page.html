@@ -14,6 +14,20 @@
   <div id="box-editor" contenteditable="true">hello</div>
   <label><input id="chk-remember" type="checkbox">记住我</label>
   <hr>
+  <form id="login-form" onsubmit="window.__ffSubmitted=(window.__ffSubmitted||0)+1; return false;">
+    <label for="ff-username">用户名</label>
+    <input id="ff-username" type="text" name="username" placeholder="请输入用户名">
+    <label for="ff-password">密码</label>
+    <input id="ff-password" type="password" name="password" placeholder="请输入密码">
+    <label for="ff-city">城市</label>
+    <select id="ff-city" name="city">
+      <option value="" selected disabled>请选择城市</option>
+      <option value="sh">上海</option>
+      <option value="bj">北京</option>
+    </select>
+    <label><input id="ff-agree" type="checkbox" name="agree"> 同意条款</label>
+    <button id="ff-submit" type="submit">登录</button>
+  </form>
   <div id="shadow-host"></div>
   <div id="results"></div>
   <label for="input-captcha">验证码</label>

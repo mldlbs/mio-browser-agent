@@ -11,6 +11,7 @@ const FIELD_SYNONYMS = {
   name: ["姓名", "名字", "真实姓名"],
   code: ["验证码", "验证", "短信验证码"],
   company: ["公司", "企业", "单位"],
+  agree: ["同意", "勾选", "条款"],
 };
 const ROLE_FIELDS = new Set(["textbox", "combobox", "checkbox", "radio"]);
 
