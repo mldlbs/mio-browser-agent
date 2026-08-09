@@ -194,11 +194,11 @@ function collectFormControls() {
   const visible = all.filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
   return visible.map((el) => {
     const role = (typeof computeRole === "function") ? computeRole(el) : (el.tagName === "SELECT" ? "combobox" : "textbox");
-    return { el, role, name: computeAccessibleName(el), placeholder: el.getAttribute("placeholder") || "", value: elementValue(el) };
+    return { el, role, name: computeAccessibleName(el), placeholder: el.getAttribute("placeholder") || "", value: controlValue(el) };
   });
 }
 
-function elementValue(el) {
+function controlValue(el) {
   if (el.tagName === "SELECT") {
     const sel = el.options[el.selectedIndex];
     return sel ? sel.text : "";
@@ -295,11 +295,13 @@ function distToNearestControl(buttonEl, controls) {
 }
 
 async function formFill(args) {
-  const fields = args.fields || {};
+  const args0 = args || {};
+  const fields = args0.fields || {};
   const keys = Object.keys(fields);
   if (!keys.length) return { ok: false, error: "form_fill requires a non-empty fields object" };
   const controls = collectFormControls();
   const perField = {};
+  const errors = [];
   let anyFilled = false;
   const missing = [];
   for (const key of keys) {
@@ -319,26 +321,33 @@ async function formFill(args) {
       res = await fillFormField(control, value);
     }
     if (res.ok) { perField[key] = "filled"; anyFilled = true; }
-    else { perField[key] = "error"; missing.push(key); }
+    else {
+      const msg = res.error || "failed to fill";
+      perField[key] = msg;
+      errors.push({ key, error: msg });
+    }
   }
   const summary = { ok: true, fields: perField, filled: keys.filter((k) => perField[k] === "filled").length, total: keys.length };
   let submitRes = { ok: true, submitted: false };
-  if (args.submit) {
+  if (args0.submit) {
     const btn = findSubmitButton(controls);
     if (btn) {
       const r = doClick(btn, 1);
-      submitRes = { ok: r.ok, submitted: true, button: computeAccessibleName(btn) };
+      submitRes = { ok: r.ok, submitted: r.ok, button: computeAccessibleName(btn) };
     } else {
       submitRes = { ok: false, submitted: false, error: "no submit button found (agent should click manually)", errorCode: "SUBMIT_NOT_FOUND" };
     }
   }
   if (!anyFilled && missing.length === keys.length) {
-    return { ok: false, error: `no fields could be matched (missing: ${missing.join(", ")})`, errorCode: "FIELD_NOT_FOUND", fields: perField, submit: submitRes };
+    return { ok: false, error: `no fields could be matched (missing: ${missing.join(", ")})`, errorCode: "FIELD_NOT_FOUND", fields: perField, errors, submit: submitRes };
   }
   if (missing.length) {
-    return { ok: false, error: `fields not matched: ${missing.join(", ")}`, errorCode: "FIELD_NOT_FOUND", fields: perField, submit: submitRes };
+    return { ok: false, error: `fields not matched: ${missing.join(", ")}`, errorCode: "FIELD_NOT_FOUND", fields: perField, errors, submit: submitRes };
   }
-  if (args.submit && !submitRes.ok) {
+  if (errors.length) {
+    return { ok: false, error: `fields failed to fill: ${errors.map((e) => `${e.key} (${e.error})`).join(", ")}`, fields: perField, errors, submit: submitRes };
+  }
+  if (args0.submit && !submitRes.ok) {
     return { ok: false, ...submitRes, fields: perField };
   }
   return { ok: true, ...summary, submit: submitRes };
