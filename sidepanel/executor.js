@@ -273,22 +273,24 @@ async function executeStep(step, ctx) {
       onLog("tool", `${tc.name} → ${result.ok ? shown : "ERR " + result.error}`);
 
       // ── Click_at spam guard ──
-      // If the agent clicks the SAME coordinates again and the page did not
-      // change at all, it is guessing blindly (observed: 4+ clicks at ~(100,4xx)
-      // while hunting a vision-only element). Flag it so it flows into the
-      // recovery chain (which can invoke vision_locate) instead of looping.
+      // If the agent clicks via click_at and the page did not change at all
+      // (same URL + same element count on the NEXT attempt), it is guessing
+      // blindly — clicking new guessed coordinates against an unchanged page.
+      // Flag it so it flows into the recovery chain (which can invoke
+      // vision_locate) instead of looping through endless coordinate guesses.
+      // The signature (url + element count) being unchanged across the clicks
+      // is the "nothing happened" signal; the exact coordinates need not match.
       if (tc.name === "click_at" && result.ok && ctx.lastSnapshot) {
-        const key = `${Math.round(tc.args.x || 0)},${Math.round(tc.args.y || 0)}`;
         const sig = `${ctx.lastSnapshot.url || ""}|${(ctx.lastSnapshot.elements || []).length}`;
         const prev = ctx._clickAtLast;
-        if (prev && prev.key === key && prev.sig === sig && ctx._clickAtSpamWarned !== key) {
-          ctx._clickAtSpamWarned = key;
-          result = { ok: false, error: "click_at hit the same coordinates with no page change; the target was likely not there. Do not keep guessing coordinates — describe the target and wait for vision guidance, or use a snapshot index.", errorCode: "CLICK_AT_UNVERIFIED" };
+        if (prev && prev.sig === sig && ctx._clickAtSpamWarned !== sig) {
+          ctx._clickAtSpamWarned = sig;
+          result = { ok: false, error: "click_at did not change the page (same URL, same element count); the target was likely not hit. Do not keep guessing coordinates — describe the target and wait for vision guidance, or use a snapshot index.", errorCode: "CLICK_AT_UNVERIFIED" };
           ctx.history.pop();
           ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
-          onLog("tool", `click_at → 盲试拦截 (${key} 无页面变化)`);
+          onLog("tool", `click_at → 盲试拦截 (页面无变化，停止猜坐标)`);
         } else {
-          ctx._clickAtLast = { key, sig };
+          ctx._clickAtLast = { sig };
         }
       }
 
@@ -810,6 +812,8 @@ async function execute(plan, ctx) {
       const newPlan = await ctx.replan(plan.goal, step, {
         done: plan.steps.slice(0, current).map((s) => s.description),
         failed: step.description,
+        failedError: result.errorCode || "",
+        failedReason: (result.error || "").slice(0, 300),
         notes: runCtx.notes.size ? runCtx.notes.toJSON() : null,
       });
       ctx.onLog("plan", "新计划: " + newPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));

@@ -36,6 +36,22 @@ async function plan(goal, llm) {
   return { goal, steps };
 }
 
+// Guidance injected into a replan prompt when a step failed with a known,
+// actionable error code. Each entry explains what went wrong and how the
+// revised plan should avoid repeating the same dead end.
+const REPLAN_FAILURE_GUIDANCE = {
+  SCROLL_AT_END: "页面已经滚动到底/顶，继续滚动不可能到达目标。改用一个不依赖滚动的策略：目标可能已在快照中（直接点），或在快照外但视觉可见（用 find_by_vision 定位坐标后 click_at）。不要在新计划中再次让 agent 反复滚动。",
+  ELEMENT_DISABLED: "目标元素处于禁用/未同步状态（通常是 React 或编辑器状态未就绪）。新计划应在点击前先等待（wait 工具）让状态同步，或改用其它可达的同功能元素/入口。",
+  FIELD_NOT_FOUND: "表单字段未能匹配（字段语义没对上，或表单尚未渲染）。新计划应先用快照确认表单已加载、核对字段的实际 label/placeholder，再用正确的字段名填充，或改用 type 按索引直接输入。",
+  SUBMIT_NOT_FOUND: "未能识别表单的提交按钮。新计划应改用快照中的按钮索引直接点击，或用 find_by_vision 定位可见的提交按钮。",
+  CLICK_AT_UNVERIFIED: "按坐标点击后页面没有任何变化，说明该坐标处没有目标。不要继续猜测坐标，改用快照索引点击，或 find_by_vision 重新精确定位。",
+  SEND_NOT_VERIFIED: "点击发送后未能确认消息发出。新计划应在发送后显式等待并验证（观察输入框清空/新回复出现）。",
+};
+
+function replanGuidance(errorCode) {
+  return REPLAN_FAILURE_GUIDANCE[errorCode] || "";
+}
+
 async function replan(goal, failedStep, llm, ctx) {
   const done = (ctx && ctx.done) || [];
   const doneText = done.length
@@ -45,10 +61,16 @@ async function replan(goal, failedStep, llm, ctx) {
   const notesText = notes && Object.keys(notes).length
     ? `\nSession data already gathered (reuse it with memo, do not re-extract):\n${Object.entries(notes).map(([k, v]) => `${k}: ${v}`).join("\n")}`
     : "";
+  const errorCode = (ctx && ctx.failedError) || "";
+  const guidance = replanGuidance(errorCode);
+  const failText = errorCode || (ctx && ctx.failedReason)
+    ? `\nIt failed with: ${errorCode ? `[${errorCode}] ` : ""}${(ctx && ctx.failedReason) || ""}`
+    : "";
+  const guidanceText = guidance ? `\n${guidance}` : "";
   const resp = await llm.generate(
     [
       { role: "system", content: PLAN_PROMPT },
-      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan for the REMAINING work only, starting from the failed step onward.${doneText}${notesText}\nDo not include already-completed steps in the new plan.` },
+      { role: "user", content: `Goal: ${goal}\n\nThe step below failed repeatedly:\n"${failedStep.description}"\nSubmit a revised plan for the REMAINING work only, starting from the failed step onward.${doneText}${notesText}${failText}${guidanceText}\nDo not include already-completed steps in the new plan.` },
     ],
     { tools: PLAN_TOOLS }
   );
@@ -57,7 +79,7 @@ async function replan(goal, failedStep, llm, ctx) {
   return { goal, steps };
 }
 
-const planner = { plan, replan, parsePlanResponse };
+const planner = { plan, replan, parsePlanResponse, replanGuidance };
 if (typeof module !== "undefined") {
   module.exports = planner;
 } else {

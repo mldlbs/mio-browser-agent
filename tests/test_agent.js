@@ -635,6 +635,16 @@ function assertEq(got, want, name) {
   assert(replanText.includes("1234"), "replan prompt carries gathered notes");
   assert(replanText.includes("已完成的步骤"), "replan prompt lists completed steps");
 
+  // ── replan injects failure guidance so the agent stops repeating the dead end ──
+  let replanFailCaptured = null;
+  const replanFailLlm = { generate: async (messages) => { replanFailCaptured = messages; return { content: "", toolCalls: [makeToolCall("submit_plan", { steps: [{ description: "改用坐标点击" }] })] }; } };
+  await plannerMod.replan("g", { description: "点按钮" }, replanFailLlm, { failedError: "SCROLL_AT_END", failedReason: "already at bottom" });
+  const replanFailText = JSON.stringify(replanFailCaptured);
+  assert(replanFailText.includes("[SCROLL_AT_END]"), "replan prompt carries the failing error code");
+  assert(replanFailText.includes("find_by_vision"), "replan prompt gives scroll-boundary guidance");
+  assertEq(plannerMod.replanGuidance("ELEMENT_DISABLED").length > 0, true, "replanGuidance covers ELEMENT_DISABLED");
+  assertEq(plannerMod.replanGuidance("UNKNOWN_CODE"), "", "replanGuidance returns empty for unknown codes");
+
   // ── classifyStep + step-type focus blocks ──
   assertEq(executorMod.classifyStep("在登录页输入验证码"), "login", "classifyStep detects login/captcha");
   assertEq(executorMod.classifyStep("发送消息并等待回复"), "send", "classifyStep detects send");
@@ -1095,6 +1105,13 @@ function assertEq(got, want, name) {
   assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").length === 3, "policy exposes all configured actions");
   assert(policy.getAllowedActions("UNKNOWN_CODE").length === 0, "policy returns empty for unknown error code");
   assert(policy.getMaxAttemptsForAction("NO_TOOL_CALLS", "scroll_and_retry") === 1, "policy exposes per-action max attempts");
+  assert(policy.getAllowedActions("SCROLL_AT_END").length > 0, "policy covers SCROLL_AT_END");
+  assert(policy.getAllowedActions("SCROLL_AT_END").some((a) => a.action === "retry_snapshot"), "SCROLL_AT_END retries snapshot before giving up");
+  assert(policy.getAllowedActions("ELEMENT_DISABLED").length > 0, "policy covers ELEMENT_DISABLED");
+  assert(policy.getAllowedActions("ELEMENT_DISABLED").some((a) => a.action === "wait_and_retry"), "ELEMENT_DISABLED waits for state sync");
+  assert(policy.getAllowedActions("FIELD_NOT_FOUND").length > 0, "policy covers FIELD_NOT_FOUND");
+  assert(policy.getAllowedActions("SUBMIT_NOT_FOUND").length > 0, "policy covers SUBMIT_NOT_FOUND");
+  assert(policy.getAllowedActions("SCROLL_AT_END", policy.withVisionFallback()).some((a) => a.action === "vision_locate"), "SCROLL_AT_END gets vision fallback when enabled");
 
   const reMod = require("../sidepanel/recovery-engine.js");
   const rrResult = await reMod.runRecovery(
@@ -1927,6 +1944,33 @@ function assertEq(got, want, name) {
   );
   assert(spamLogs.some(([t, x]) => t === "tool" && x.includes("盲试拦截")), "click_at spam guard flags repeated same-coordinate clicks");
   assert(spamRecovery.some((e) => e.code === "CLICK_AT_UNVERIFIED"), "spam guard flows to recovery with CLICK_AT_UNVERIFIED");
+
+  // click_at guard also flags DIFFERENT coordinates when the page is unchanged
+  // (agent switching guessed pixels against the same static page is blind too).
+  const spamLogs2 = [];
+  const spamRecovery2 = [];
+  const spam2Bridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "b" }] }),
+    executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
+  };
+  const spam2Llm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 375, y: 820 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 470, y: 840 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }),
+  ]);
+  const spam2Exec = await executorMod.executeStep(
+    { description: "点目标" },
+    {
+      llm: spam2Llm, bridge: spam2Bridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: (t, x) => spamLogs2.push([t, x]), onRecovery: (ev) => spamRecovery2.push(ev),
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点目标" }] }, goal: "g",
+      maxTurns: 4, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(spamLogs2.some(([t, x]) => t === "tool" && x.includes("盲试拦截")), "click_at guard flags changed-coordinate clicks on an unchanged page");
+  assert(spamRecovery2.some((e) => e.code === "CLICK_AT_UNVERIFIED"), "changed-coordinate blind clicks flow to recovery");
 
   // ── find_by_vision tool: sight-based location for snapshot-missing targets ──
   const fbvTool = registryMod.getTool("find_by_vision");

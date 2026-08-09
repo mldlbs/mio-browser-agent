@@ -32,6 +32,30 @@ const DEFAULT_RECOVERY_POLICY = {
     { action: "wait_and_retry", priority: 90, maxAttempts: 2 },
     { action: "retry_snapshot", priority: 80, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
+  ],
+  // Already at a scroll boundary: further scroll can never reach the target, so
+  // the only DOM-side option is a fresh snapshot (target may have re-rendered).
+  // vision_locate is appended when the vision fallback is enabled so a target
+  // that IS visible but outside the DOM locator can still be reached by pixels.
+  SCROLL_AT_END: [
+    { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
+    { action: "finish", priority: 10, maxAttempts: 1 }
+  ],
+  // A control is disabled (often a transient React/editor sync state right after
+  // another interaction). Wait for the state to settle, then retry; do not
+  // immediately give up and do not spam clicks on the same disabled element.
+  ELEMENT_DISABLED: [
+    { action: "wait_and_retry", priority: 100, maxAttempts: 2 },
+    { action: "retry_snapshot", priority: 70, maxAttempts: 1 },
+    { action: "finish", priority: 10, maxAttempts: 1 }
+  ],
+  FIELD_NOT_FOUND: [
+    { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
+    { action: "finish", priority: 10, maxAttempts: 1 }
+  ],
+  SUBMIT_NOT_FOUND: [
+    { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
+    { action: "finish", priority: 10, maxAttempts: 1 }
   ]
 };
 
