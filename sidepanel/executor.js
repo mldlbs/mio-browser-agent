@@ -559,8 +559,11 @@ function detectPageRisk(snapshot) {
   if (riskyUrl || captchaTitle) {
     return { reason: "页面出现验证码/人机验证（captcha）", url: url || title };
   }
-  const removedTitle = /this post was removed|this content was removed|post removed|帖子已被删除|已被删除|removed by moderator|unavailable/i.test(title);
-  const removedUrl = /removed|deleted/.test(url) && /reddit|\.com/.test(url);
+  const removedTitle = /this post was removed|this content was removed|post removed|帖子已被删除|已被删除|removed by moderator|reddit\.com.*(removed|deleted)/i.test(title);
+  // Only flag URLs that look like a real deleted/404 resource path, not any
+  // .com page whose path merely contains the word (w3schools/example pages
+  // were false-positive'd by the old /removed|deleted/ + /.com/ rule).
+  const removedUrl = /\/(removed|deleted)(\/|$)/i.test(url);
   if (removedTitle || removedUrl) {
     return { reason: "页面内容已被删除/不可用，继续操作无意义", url: url || title };
   }

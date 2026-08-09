@@ -1917,6 +1917,12 @@ function assertEq(got, want, name) {
   assert(riskDetect({ url: "https://www.reddit.com/r/AI_Agents/", title: "AI Agents" }) == null, "normal page not flagged");
   assert(riskDetect({ url: "https://www.reddit.com/mod/chrome_extensions/rules/", title: "Mod tools" }) != null, "moderator tools page flagged as risky");
   assert(riskDetect({ url: "https://www.reddit.com/r/chrome_extensions/about/rules/", title: "rules" }) == null, "public about/rules page not flagged");
+  // Narrow the deleted-resource heuristic: a normal page whose path merely
+  // contains 'deleted' must NOT be flagged (w3schools/example pages were
+  // false-positive'd by the old /removed|deleted/ + /.com/ rule).
+  assert(riskDetect({ url: "https://www.w3schools.com/html/html_iframe.asp", title: "HTML Tutorial" }) == null, "normal .com page not flagged");
+  assert(riskDetect({ url: "https://example.com/items/deleted-items/", title: "Items" }) == null, "path containing 'deleted' but not a delete page not flagged");
+  assert(riskDetect({ url: "https://www.reddit.com/r/x/comments/abc/removed", title: "Post" }) != null, "removed path still flagged");
   assert(riskDetect(null) == null, "null snapshot not flagged");
 
   // PAGE_RISK_STOP: 3 consecutive rounds on a risky page stop the step.
