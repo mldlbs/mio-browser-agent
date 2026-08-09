@@ -121,7 +121,7 @@ async function executeStep(step, ctx) {
     
     // Trim history
     if (ctx.history.length > 40) {
-      trimHistory(ctx.history, 40);
+      trimHistory(ctx.history, 40, ctx);
     }
     
     // Get fresh snapshot
@@ -685,7 +685,7 @@ function createNotesSession() {
 
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-function trimHistory(history, maxLen) {
+function trimHistory(history, maxLen, ctx) {
   if (history.length <= maxLen) return;
   let i = 1;
   while (i < history.length && history.length - i >= maxLen) {
@@ -695,7 +695,25 @@ function trimHistory(history, maxLen) {
       while (i < history.length && history[i].role === "tool") i++;
     }
   }
-  history.splice(1, i - 1);
+  // Count of messages we intend to drop (from index 1 up to i-1).
+  const dropCount = i - 1;
+  // Inject a compressed summary of completed steps before trimming, so long
+  // tasks do not lose "what was already done" context when old turns are
+  // dropped (memo preserves data; this preserves the narrative).
+  let inserted = 0;
+  if (ctx && ctx.completedSteps && ctx.completedSteps.length) {
+    const summary = ctx.completedSteps
+      .map((s) => `- ${s.description}${s.summary ? "： " + s.summary : ""}`)
+      .join("\n");
+    history.splice(1, 0, {
+      role: "user",
+      content: `[历史摘要] 已完成步骤：\n${summary}\n（这些步骤已完成，不要重复执行；如需其中的数据用 memo 读取。）`,
+    });
+    inserted = 1;
+  }
+  // Drop the old messages that would have been removed, shifting start by the
+  // inserted summary so recent context stays intact.
+  history.splice(1 + inserted, dropCount);
 }
 
 function changeNote(diff) {
@@ -725,6 +743,7 @@ async function execute(plan, ctx) {
   runCtx.recoveryHistory = [];
   runCtx.recoveryAttempts = 0;
   runCtx.notes = ctx.notes || createNotesSession();
+  runCtx.completedSteps = [];
 
   const buildResume = () => ({
     goal: plan.goal,
@@ -768,6 +787,7 @@ async function execute(plan, ctx) {
       runCtx.recoveryAttempts = 0;
       runCtx.recoveryHistory = [];
       if (result.summary) lastSummary = result.summary;
+      runCtx.completedSteps.push({ description: step.description, summary: result.summary || "" });
       ctx.onLog("step", "DONE: " + (result.summary || "完成"));
       emitProgress("done", { summary: result.summary || "", currentIndex: doneIndex });
       emitCheckpoint();

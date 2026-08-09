@@ -874,6 +874,25 @@ function assertEq(got, want, name) {
   const thToolIds = th.filter((m) => m.role === "tool").length;
   assert(thToolIds === 1, "trimHistory keeps exactly one full tool turn");
 
+  // ── trimHistory injects a completed-steps summary when ctx provides them ──
+  const th2 = [
+    { role: "system", content: "" },
+    { role: "user", content: "u1" },
+    { role: "assistant", content: "", tool_calls: [{ id: "t1", type: "function", function: { name: "click", arguments: "{}" } }] },
+    { role: "tool", tool_call_id: "t1", content: "ok" },
+    { role: "user", content: "u2" },
+    { role: "assistant", content: "", tool_calls: [{ id: "t2", type: "function", function: { name: "click", arguments: "{}" } }] },
+    { role: "tool", tool_call_id: "t2", content: "ok" },
+    { role: "user", content: "u3" },
+  ];
+  executorMod.trimHistory(th2, 5, {
+    completedSteps: [{ description: "打开搜索页", summary: "已打开" }, { description: "提取标题" }],
+  });
+  const summaryMsg = th2.find((m) => m.role === "user" && m.content.includes("历史摘要"));
+  assert(!!summaryMsg, "trimHistory injects a history summary when completed steps exist");
+  assert(summaryMsg.content.includes("打开搜索页") && summaryMsg.content.includes("提取标题"), "summary includes completed step descriptions");
+  assert(th2.length <= 6, "summary injection keeps history bounded", "len=" + th2.length);
+
   // ── tool exception fails the step instead of crashing the run ──
   const throwLlm = mockLlm([
     () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),
