@@ -55,4 +55,6 @@ function matchField(fieldKey, el) {
 
 if (typeof module !== "undefined") {
   module.exports = { FIELD_SYNONYMS, matchField };
+} else {
+  globalThis.FieldsModule = { FIELD_SYNONYMS, matchField };
 }

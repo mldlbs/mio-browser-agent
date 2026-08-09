@@ -1361,6 +1361,28 @@ function assertEq(got, want, name) {
   const ffBad = await ffTool.execute({}, ffCtx);
   assert(!ffBad.ok, "form_fill without fields fails");
 
+  // ── type tool: field parameter locates a snapshot element semantically ──
+  const typeBridge = {
+    executeAction: async (action) => {
+      if (action.name !== "type") return { ok: false, error: "expected type" };
+      return { ok: true, value: "typed " + action.target.name, action };
+    },
+  };
+  const typeCtx = {
+    snapshot: { elements: [
+      { index: 0, role: "textbox", name: "用户名", placeholder: "请输入用户名" },
+      { index: 1, role: "button", name: "登录" },
+    ]},
+    bridge: typeBridge,
+  };
+  const typeTool = registryMod.getTool("type");
+  const tf1 = await typeTool.execute({ field: "username", text: "alice" }, typeCtx);
+  assert(tf1.ok && tf1.action && tf1.action.target.name === "用户名", "type field=username resolves to 用户名 element");
+  const tf2 = await typeTool.execute({ index: 1, field: "username", text: "x" }, typeCtx);
+  assert(!tf2.ok, "type with both index and field fails");
+  const tf3 = await typeTool.execute({ field: "nosuch", text: "x" }, typeCtx);
+  assert(!tf3.ok, "type field not found fails");
+
   // ── resume: checkpoint carries notes; resume run restores them ──
   const notesCheckpoints = [];
   const notesBridge = {
