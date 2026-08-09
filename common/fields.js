@@ -18,13 +18,32 @@ function normalizeText(s) {
   return String(s == null ? "" : s).toLowerCase().replace(/\s+/g, "");
 }
 
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// ASCII word keys must match at token boundaries, else short keys like "name",
+// "code", or "search" substring-collide with identifiers like "username-input",
+// "area_code", or "research". CJK/mixed keys keep plain substring matching.
+function isAsciiWordKey(key) {
+  return /^[a-z0-9]+$/.test(key);
+}
+
+function tokenBoundaryExact(key, name, ph) {
+  const re = new RegExp("(^|[^a-z0-9_])" + escapeRegExp(key) + "($|[^a-z0-9_])");
+  return re.test(name) || re.test(ph);
+}
+
 function matchField(fieldKey, el) {
   if (!fieldKey || !el) return { quality: "none", fieldKey };
   if (!ROLE_FIELDS.has(el.role)) return { quality: "none", fieldKey };
   const key = normalizeText(fieldKey);
   const name = normalizeText(el.name);
   const ph = normalizeText(el.placeholder);
-  if (key && (name.includes(key) || ph.includes(key))) return { quality: "exact", fieldKey };
+  if (key) {
+    const exact = isAsciiWordKey(key) ? tokenBoundaryExact(key, name, ph) : (name.includes(key) || ph.includes(key));
+    if (exact) return { quality: "exact", fieldKey };
+  }
   const syns = FIELD_SYNONYMS[fieldKey] || [];
   for (const s of syns) {
     const n = normalizeText(s);
