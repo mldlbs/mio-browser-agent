@@ -75,6 +75,23 @@ function assertEq(got, want, name) {
   assertEq(m.type, protocol.MSG.ACTION_EXECUTE, "make sets type");
   assertEq(m.payload.taskId, 1, "make sets payload");
 
+  // ── form-fill field matching (common/fields.js) ──
+  const fieldsMod = require("../common/fields.js");
+  const ff = fieldsMod.matchField;
+  assertEq(ff("username", { name: "用户名", placeholder: "", role: "textbox" }).quality, "synonym", "matchField synonym: 用户名 hits username");
+  assertEq(ff("username", { name: "", placeholder: "请输入用户名", role: "textbox" }).quality, "synonym", "matchField synonym via placeholder");
+  assertEq(ff("username", { name: "username-input", placeholder: "", role: "textbox" }).quality, "exact", "matchField exact: ascii key substring in name");
+  assertEq(ff("username", { name: "Email", placeholder: "", role: "textbox" }).quality, "none", "matchField: username does not match email");
+  assertEq(ff("password", { name: "密码", placeholder: "", role: "textbox" }).quality, "synonym", "matchField synonym: 密码 hits password");
+  assertEq(ff("email", { name: "邮箱", placeholder: "", role: "textbox" }).quality, "synonym", "matchField synonym: 邮箱 hits email");
+  assertEq(ff("city", { name: "城市", placeholder: "", role: "combobox" }).quality, "synonym", "matchField synonym: 城市 hits city");
+  assertEq(ff("phone", { name: "手机号", placeholder: "", role: "textbox" }).quality, "synonym", "matchField synonym: 手机号 hits phone");
+  assertEq(ff("zzzz", { name: "用户名", placeholder: "", role: "textbox" }).quality, "none", "matchField unknown key returns none");
+  assertEq(ff("username", { name: "", placeholder: "", role: "button" }).quality, "none", "matchField ignores non-field roles");
+  assertEq(ff("username", null).quality, "none", "matchField handles null element");
+  assert(fieldsMod.FIELD_SYNONYMS.password.includes("密码"), "FIELD_SYNONYMS covers password");
+  assert(fieldsMod.FIELD_SYNONYMS.email.includes("邮箱"), "FIELD_SYNONYMS covers email");
+
   const snap = { url: "https://x.com", title: "X", elements: [
     { index: 0, role: "button", name: "登录", value: "", boundingBox: { x: 1, y: 2, w: 3, h: 4 } },
     { index: 1, role: "textbox", name: "搜索", value: "abc", boundingBox: null },

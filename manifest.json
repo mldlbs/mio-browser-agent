@@ -31,6 +31,7 @@
       "all_frames": true,
       "js": [
         "common/protocol.js",
+        "common/fields.js",
         "content/snapshot.js",
         "content/locator.js",
         "content/executor.js",
