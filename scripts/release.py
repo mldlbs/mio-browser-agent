@@ -261,6 +261,19 @@ def main():
             notes = f.read()
 
     tag = f"v{version}"
+
+    # Point the tag at the commit being shipped. GitHub auto-creates a tag at
+    # the DEFAULT-branch HEAD when the release API is called without an
+    # existing tag — if the current commit isn't pushed yet, the tag lands on a
+    # stale commit (observed: v0.1.39 tagged 1dad8f0 instead of its bump). So
+    # create/push the tag locally first, then let the API attach to it.
+    if _run_git("rev-parse", "-q", "--verify", f"refs/tags/{tag}"):
+        _run_git("tag", "-f", tag, "HEAD")
+        _run_git("push", "origin", f"{tag}:{tag}", "--force")
+    else:
+        _run_git("tag", tag, "HEAD")
+        _run_git("push", "origin", tag)
+
     st, body = api(tok, "POST", f"/repos/{GITHUB_REPO}/releases", data={
         "tag_name": tag, "name": tag, "body": notes,
         "draft": args.draft, "prerelease": False,
