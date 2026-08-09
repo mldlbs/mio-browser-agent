@@ -45,8 +45,10 @@ function matchField(fieldKey, el) {
     const exact = isAsciiWordKey(key) ? tokenBoundaryExact(key, name, ph) : (name.includes(key) || ph.includes(key));
     if (exact) return { quality: "exact", fieldKey };
   }
-  const syns = FIELD_SYNONYMS[fieldKey] || [];
-  for (const s of syns) {
+  if (!Object.prototype.hasOwnProperty.call(FIELD_SYNONYMS, fieldKey)) {
+    return { quality: "none", fieldKey };
+  }
+  for (const s of FIELD_SYNONYMS[fieldKey]) {
     const n = normalizeText(s);
     if (name.includes(n) || ph.includes(n)) return { quality: "synonym", fieldKey };
   }

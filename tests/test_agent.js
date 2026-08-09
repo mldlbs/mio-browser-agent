@@ -98,6 +98,8 @@ function assertEq(got, want, name) {
   assertEq(ff("code", { name: "code", placeholder: "", role: "textbox" }).quality, "exact", "matchField: code matches exact token");
   assertEq(ff("code", { name: "验证码", placeholder: "", role: "textbox" }).quality, "synonym", "matchField: code hits 验证码 via synonym table");
   assertEq(ff("username", { name: "", placeholder: "", role: "textbox" }).quality, "none", "matchField: empty name+placeholder no match");
+  assertEq(ff("__proto__", { name: "用户名", placeholder: "", role: "textbox" }).quality, "none", "matchField: prototype-inherited key does not crash");
+  assertEq(ff("constructor", { name: "用户名", placeholder: "", role: "textbox" }).quality, "none", "matchField: constructor key does not crash");
 
   const snap = { url: "https://x.com", title: "X", elements: [
     { index: 0, role: "button", name: "登录", value: "", boundingBox: { x: 1, y: 2, w: 3, h: 4 } },
