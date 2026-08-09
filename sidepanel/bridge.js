@@ -99,8 +99,16 @@ function createPageBridge() {
       try {
         const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
         return dataUrl || null;
-      } catch (_) {
-        return null; // requires "activeTab" or host permission; caller degrades gracefully
+      } catch (e) {
+        // captureVisibleTab fails for data:/chrome:///extension pages and when
+        // activeTab was never granted. Surface WHY so the agent can react
+        // (e.g. navigate to a real page) instead of retrying blindly.
+        const msg = (e && e.message) || String(e);
+        const tabUrl = (tab && tab.url) || "";
+        if (/data:|chrome:\/\/|^extension/i.test(tabUrl)) {
+          throw new Error("当前页面无法截图（浏览器限制 data:/chrome:// 页面）：" + tabUrl.slice(0, 80));
+        }
+        throw new Error("截图失败: " + msg.slice(0, 120));
       }
     },
     // Navigate at the BROWSER level (chrome.tabs.update) so it works even when
