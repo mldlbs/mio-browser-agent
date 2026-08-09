@@ -1252,6 +1252,12 @@ function assertEq(got, want, name) {
   assert(tabLines.includes("Tabs: [0] 首页"), "snapshotToLines lists tabs");
   const singleTabLines = protocol.snapshotToLines({ url: "u", title: "t", tabCount: 1, tabIndex: 0, elements: [] });
   assert(!singleTabLines.includes("Tab 1/1"), "snapshotToLines omits tab prefix for single tab");
+  // ── snapshotToLines truncates huge element lists to cap per-turn tokens ──
+  const manyElems = Array.from({ length: 200 }, (_, i) => ({ index: i, role: "button", name: "b" + i }));
+  const manyLines = protocol.snapshotToLines({ url: "u", title: "t", tabCount: 1, tabIndex: 0, elements: manyElems });
+  const renderedCount = (manyLines.match(/\[(\d+)\] button/g) || []).length;
+  assert(renderedCount === 60, "snapshotToLines renders at most 60 elements", "rendered " + renderedCount);
+  assert(manyLines.includes("还有 140 个元素未列出"), "snapshotToLines notes the truncated count");
 
   // ── memory: navigation / tab switch does not report a noisy diff ──
   const tabMem = memoryMod.createMemory();

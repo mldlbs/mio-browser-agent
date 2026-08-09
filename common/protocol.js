@@ -36,7 +36,12 @@ function snapshotToLines(snapshot) {
     const tabDesc = snapshot.tabs.map((t) => `[${t.index}] ${t.title || t.url}${t.active ? "*" : ""}`).join("  ");
     lines.push(`Tabs: ${tabDesc}`);
   }
-  snapshot.elements.forEach((e) => {
+  // Cap the rendered element list so a huge page (500+ elements) does not blow
+  // up per-turn token cost. The full snapshot object is still available to the
+  // tools; only the prompt representation is truncated.
+  const MAX_RENDER = 60;
+  const elems = snapshot.elements || [];
+  elems.slice(0, MAX_RENDER).forEach((e) => {
     const state = [];
     if (e.value) state.push(`value="${e.value}"`);
     if (e.checked) state.push("checked");
@@ -46,6 +51,9 @@ function snapshotToLines(snapshot) {
     const frame = e.frameId ? ` [frame ${e.frameId}]` : "";
     lines.push(`[${e.index}] ${e.role} "${e.name}"${dest}${frame}${state.length ? " " + state.join(" ") : ""}${box}`);
   });
+  if (elems.length > MAX_RENDER) {
+    lines.push(`… 还有 ${elems.length - MAX_RENDER} 个元素未列出（共 ${elems.length}）`);
+  }
   return lines.join("\n");
 }
 

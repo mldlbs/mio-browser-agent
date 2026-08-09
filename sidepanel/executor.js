@@ -33,10 +33,11 @@ Current step: {step}
 
 {stepFocus}
 
-You receive the page as a numbered list of interactive elements:
+- You receive the page as a numbered list of interactive elements:
 [0] link "首页"
 [1] textbox "搜索"
 [2] button "登录"
+- On large pages the list may be truncated (… 还有 N 个元素未列出). All element indexes are still valid and clickable — an element not shown can still be referenced by its index.
 
 Use tools to manipulate the page. Rules:
 - You are executing ONLY the Current step shown above. Do not start later steps on your own.
