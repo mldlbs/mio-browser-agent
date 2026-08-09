@@ -24,6 +24,7 @@ require("../tools/tab.js");
 require("../tools/memo.js");
 require("../tools/click_at.js");
 require("../tools/find_by_vision.js");
+require("../tools/form_fill.js");
 const plannerMod = require("../sidepanel/planner.js");
 const memoryMod = require("../sidepanel/memory.js");
 const notesMod = require("../sidepanel/notes.js");
@@ -1343,6 +1344,22 @@ function assertEq(got, want, name) {
   assert(rmRes.ok, "memo remove succeeds");
   const clearRes = await memoTool.execute({ mode: "clear" }, memoCtx);
   assert(clearRes.ok && memoCtx.notes.size() === 0, "memo clear wipes all");
+
+  // ── form_fill tool: thin wrapper over the content-side action ──
+  const ffBridge = {
+    executeAction: async (action) => {
+      if (action.name !== "form_fill") return { ok: false, error: "expected form_fill" };
+      return { ok: true, value: "did form_fill", fields: action.args.fields };
+    },
+  };
+  const ffCtx = { snapshot: { elements: [] }, bridge: ffBridge };
+  const ffTool = registryMod.getTool("form_fill");
+  assert(ffTool, "form_fill tool registered");
+  const ffRes2 = await ffTool.execute({ fields: { username: "a" }, submit: true }, ffCtx);
+  assert(ffRes2.ok && ffRes2.value === "did form_fill", "form_fill forwards fields+submit to bridge");
+  assertEq(ffRes2.fields.username, "a", "form_fill passes fields through");
+  const ffBad = await ffTool.execute({}, ffCtx);
+  assert(!ffBad.ok, "form_fill without fields fails");
 
   // ── resume: checkpoint carries notes; resume run restores them ──
   const notesCheckpoints = [];
