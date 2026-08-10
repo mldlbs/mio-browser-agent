@@ -294,6 +294,12 @@ function assertEq(got, want, name) {
   const mockDoc2 = { querySelectorAll: (sel) => (sel === "*" ? [{ nodeType: 1, shadowRoot: srootWithInput }] : []), querySelector: (sel) => (sel === "input" ? null : null) };
   assert(shadowMod.findElementInShadows("input", mockDoc2) === foundEl, "findElementInShadows finds element inside open shadow root");
 
+  // ── shadowPath 现在用 cssPath（宿主链），不再是 XPath ──
+  const cssHost0 = { nodeType: 1, tagName: "DIV", id: "hostA", parentNode: null };
+  const cssHost1 = { nodeType: 1, tagName: "DIV", id: "hostB", parentNode: null };
+  assertEq(snapshotMod.buildCssPath(cssHost0), "#hostA", "shadow host cssPath uses id");
+  assertEq(snapshotMod.buildCssPath(cssHost1), "#hostB", "nested shadow host cssPath uses id");
+
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
   const wfSaved = global.document;
   const wfMockDoc = { body: { innerText: "" }, querySelector: () => null, querySelectorAll: () => [] };

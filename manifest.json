@@ -32,6 +32,7 @@
       "js": [
         "common/protocol.js",
         "common/fields.js",
+        "content/shadow.js",
         "content/snapshot.js",
         "content/locator.js",
         "content/executor.js",

@@ -224,6 +224,8 @@ function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
     });
   }
   // Recurse into open shadow roots (closed roots are inaccessible by design).
+  // shadowPath is a chain of host cssPaths: querySelector works on both
+  // documents and ShadowRoots, so nested shadows (root inside root) resolve.
   let hosts;
   try {
     hosts = Array.from(root.querySelectorAll("*")).filter((el) => el.shadowRoot && el.shadowRoot.mode === "open");
@@ -232,7 +234,7 @@ function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
     const sroot = host.shadowRoot;
     if (!sroot || visited.has(sroot)) return;
     visited.add(sroot);
-    scanRoot(sroot, framePath || [], (shadowPath || []).concat(buildXPath(host)), elements, visited);
+    scanRoot(sroot, framePath || [], (shadowPath || []).concat(buildCssPath(host)), elements, visited);
   });
 }
 
