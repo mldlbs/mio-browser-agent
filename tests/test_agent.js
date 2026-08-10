@@ -489,6 +489,14 @@ function assertEq(got, want, name) {
   assertEq(all.length, 2, "filterRecords empty query returns all");
   assert(all[0].pinned, "sortRecords puts pinned first");
 
+  // ── history.js 持久化 stepEvents（含封顶）──
+  const manyEvents = Array.from({ length: 150 }, (_, i) => ({ type: "tool_failed", stepIndex: 0, name: "x" + i }));
+  const norm = historyMod.normalizeRecord({ id: "r1", goal: "g", logs: [{ tag: "tool", text: "ok" }], stepEvents: manyEvents });
+  assert(Array.isArray(norm.stepEvents), "normalizeRecord keeps stepEvents");
+  assert(norm.stepEvents.length === 100, "normalizeRecord caps stepEvents at 100", String(norm.stepEvents.length));
+  const normEmpty = historyMod.normalizeRecord({ goal: "g" });
+  assert(Array.isArray(normEmpty.stepEvents) && normEmpty.stepEvents.length === 0, "normalizeRecord defaults stepEvents to []");
+
   // ── importRecords: merge exported JSON, dedupe by id, cap at MAX_RECORDS ──
   await historyMod.addHistoryRecord({ id: "x1", goal: "既有任务", status: "done", startedAt: 5 });
   const imp1 = await historyMod.importRecords([

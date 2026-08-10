@@ -12,6 +12,7 @@ function normalizeRecord(r) {
     recoveries: r && r.recoveries || 0,
     replans: r && r.replans || 0,
     logs: Array.isArray(r && r.logs) ? r.logs : [],
+    stepEvents: Array.isArray(r && r.stepEvents) ? r.stepEvents.slice(-100) : [],
     resume: r && r.resume || null,
     pinned: !!(r && r.pinned),
     tags: Array.isArray(r && r.tags) ? r.tags.slice(0, 8) : [],
