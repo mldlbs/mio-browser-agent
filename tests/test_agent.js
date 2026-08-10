@@ -897,6 +897,24 @@ function assertEq(got, want, name) {
   assert(evRes.events.some((e) => e.type === "recovery" && e.kind === "attempt" && e.ok), "events contain recovery attempt");
   assert(evRes.events.some((e) => e.type === "tool_failed" && e.name === "click"), "events contain tool_failed for failed tool");
 
+  // ── agent-runtime 转发 onCheckpoint（修复死回调）──
+  const cpCaptured = [];
+  const rtCpLlm = { generate: async () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }) };
+  const rtCp = runtimeMod.createAgentRuntime({
+    settings: {},
+    bridge: { snapshot: async () => ({ url: "u", title: "t", elements: [] }), executeAction: async () => ({ ok: true, value: "ok" }) },
+    onLog: () => {}, onRecovery: () => {}, onState: () => {}, onProgress: () => {},
+    onCheckpoint: (cp) => cpCaptured.push(cp),
+    deps: {
+      llm: rtCpLlm,
+      maxTurns: 2, maxStepRetries: 1, maxSteps: 5,
+      notes: { createNotes: () => ({ size: 0, toJSON: () => ({}), get: () => null, set: () => {}, render: () => "" }) },
+    },
+  });
+  const rtResCp = await rtCp.run("g");
+  assert(rtResCp.ok, "agent-runtime runs task");
+  assert(cpCaptured.length > 0, "agent-runtime forwards onCheckpoint callbacks", String(cpCaptured.length));
+
   // ── multi-step replan resumes from the failed step, not step 0 ──
   // stepA completes, stepB keeps failing until replan; replan receives the
   // completed-step list (done=["A"]) so the planner avoids redoing step A.

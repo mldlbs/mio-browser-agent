@@ -1,4 +1,4 @@
-function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = () => {}, onState = () => {}, onProgress = () => {}, deps = {} }) {
+function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = () => {}, onCheckpoint = () => {}, onState = () => {}, onProgress = () => {}, deps = {} }) {
   const llm = deps.llm || createAdapter(settings);
   const memory = createMemory();
   const notesMod = deps.notes || (typeof module !== "undefined" ? require("./notes.js") : globalThis.NotesModule);
@@ -29,7 +29,7 @@ function createAgentRuntime({ settings, bridge, onLog = () => {}, onRecovery = (
       onState("running");
       const notes = notesMod.createNotes(resume && resume.notes ? resume.notes : null);
       const result = await executor.execute(planDoc, {
-        llm, bridge, memory, notes, onLog, onRecovery, onProgress,
+        llm, bridge, memory, notes, onLog, onRecovery, onCheckpoint, onProgress,
         getTool, getToolsSchema,
         startStep: (resume && resume.nextStepIndex) || 0,
         replan: (goal2, step, ctx2) => planner.replan(goal2, step, llm, ctx2),
