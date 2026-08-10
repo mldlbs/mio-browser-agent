@@ -2,6 +2,7 @@
 const snapshotMod = require("../content/snapshot.js");
 const contentExecMod = require("../content/executor.js");
 const locatorMod = require("../content/locator.js");
+const shadowMod = require("../content/shadow.js");
 const storage = require("../common/storage.js");
 const historyMod = require("../common/history.js");
 const templatesMod = require("../common/templates.js");
@@ -277,6 +278,21 @@ function assertEq(got, want, name) {
   assert(locatorMod.findByCssPath("", sroot) === null, "findByCssPath empty returns null");
   assert(locatorMod.findByCssPath("#nope", { querySelector: () => null }) === null, "findByCssPath miss returns null");
   assert(locatorMod.findByXPath("//x", {}) === null, "findByXPath guards non-evaluate containers");
+
+  // ── shadow.js 统一遍历工具 ──
+  const deepRoot = { mode: "open", querySelectorAll: () => [], querySelector: () => null };
+  const innerHost = { nodeType: 1, shadowRoot: deepRoot, querySelectorAll: () => [] };
+  const outerHost = { nodeType: 1, shadowRoot: { mode: "open", querySelectorAll: () => [innerHost], querySelector: () => null }, querySelectorAll: () => [] };
+  const mockDoc = { querySelectorAll: (sel) => (sel === "*" ? [outerHost] : []), querySelector: () => null };
+  const collected = shadowMod.collectOpenShadowRoots(mockDoc);
+  assert(collected.includes(deepRoot), "collectOpenShadowRoots descends nested open shadow roots", JSON.stringify(collected.map((r) => r.mode)));
+  const visitedRoots = [];
+  shadowMod.walkShadowTree(mockDoc, (r) => visitedRoots.push(r));
+  assert(visitedRoots.length === 3, "walkShadowTree visits doc + all open roots", String(visitedRoots.length));
+  const foundEl = { tagName: "INPUT" };
+  const srootWithInput = { mode: "open", querySelectorAll: () => [], querySelector: (sel) => (sel === "input" ? foundEl : null) };
+  const mockDoc2 = { querySelectorAll: (sel) => (sel === "*" ? [{ nodeType: 1, shadowRoot: srootWithInput }] : []), querySelector: (sel) => (sel === "input" ? null : null) };
+  assert(shadowMod.findElementInShadows("input", mockDoc2) === foundEl, "findElementInShadows finds element inside open shadow root");
 
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
   const wfSaved = global.document;
