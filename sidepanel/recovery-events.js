@@ -42,8 +42,20 @@ function renderEventStream(events) {
   return lines.join("\n");
 }
 
+// Render a per-step failure narrative from a list of recovery events
+// ({type:"recovery", kind:"error"|"attempt"|"outcome", ...}).
+function renderStepFailure(events) {
+  if (!events || !events.length) return "";
+  const agg = startEvents();
+  for (const ev of events) {
+    if (ev.kind === "error") agg.stepId = ev.stepIndex;
+    addEvent(agg, ev);
+  }
+  return renderEventStream(agg);
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { startEvents, addEvent, renderEventStream };
+  module.exports = { startEvents, addEvent, renderEventStream, renderStepFailure };
 } else {
-  globalThis.RecoveryEventsModule = { startEvents, addEvent, renderEventStream };
+  globalThis.RecoveryEventsModule = { startEvents, addEvent, renderEventStream, renderStepFailure };
 }

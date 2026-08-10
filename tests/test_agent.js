@@ -1400,6 +1400,20 @@ function assertEq(got, want, name) {
   revMod.addEvent(strIdEvs, { kind: "error", stepId: "step-a", code: "X" });
   assert(revMod.renderEventStream(strIdEvs).includes("[步骤 step-a]"), "render keeps string step ids as-is");
 
+  // ── renderStepFailure：给定某步骤的 recovery 事件，渲染失败叙事 ──
+  const stepRecovery = [
+    { type: "recovery", stepIndex: 0, kind: "error", code: "ELEMENT_NOT_FOUND", message: "未找到元素" },
+    { type: "recovery", stepIndex: 0, kind: "attempt", action: "retry_snapshot", reason: "重新获取页面快照", ok: true, attempt: 1 },
+    { type: "recovery", stepIndex: 0, kind: "attempt", action: "vision_locate", reason: "视觉确认目标不可见", ok: false, attempt: 2 },
+    { type: "recovery", stepIndex: 0, kind: "outcome", outcome: "exhausted" },
+  ];
+  const narrative = revMod.renderStepFailure(stepRecovery);
+  assert(narrative.includes("ELEMENT_NOT_FOUND"), "renderStepFailure shows error code");
+  assert(narrative.includes("retry_snapshot") && narrative.includes("✓"), "renderStepFailure shows success attempt");
+  assert(narrative.includes("vision_locate") && narrative.includes("✗"), "renderStepFailure shows failed attempt");
+  assert(narrative.includes("恢复用尽"), "renderStepFailure shows exhausted outcome");
+  assertEq(revMod.renderStepFailure([]), "", "renderStepFailure empty returns empty string");
+
   // scroll_and_retry: attempt 2 avoids duplicate retry_snapshot → issues scroll (delta capped at 800px)
   let scrolled = null;
   const scrollBridge = {
