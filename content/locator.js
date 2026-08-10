@@ -1,5 +1,6 @@
 // Multi-strategy element relocation. Strategy order: xpath → role+name → rect.
 // iframe-aware: target.framePath (array of iframe indexes) selects the document.
+const shadowTools = (typeof require === "function") ? require("./shadow.js") : globalThis.shadowTools;
 function resolveFrameDoc(framePath) {
   let doc = document;
   (framePath || []).forEach((fi) => {
@@ -10,16 +11,18 @@ function resolveFrameDoc(framePath) {
   return doc;
 }
 
-// Descend through open shadow roots. shadowPath is an array of host XPaths
-// collected by snapshot.js; each step lands on the shadow host then its open root.
+// Descend through open shadow roots. shadowPath is an array of host cssPaths
+// (collected by snapshot.js); querySelector works on both documents and
+// ShadowRoots, so nested shadows (root inside root) resolve correctly —
+// unlike XPath evaluate(), which ShadowRoot does not expose.
 function resolveShadowPath(root, shadowPath) {
   let container = root;
-  (shadowPath || []).forEach((hostXpath) => {
-    if (!container || typeof container.evaluate !== "function") return;
-    const host = findByXPath(hostXpath, container);
-    if (!host || !host.shadowRoot || host.shadowRoot.mode !== "open") return;
+  for (const hostCss of shadowPath || []) {
+    if (!container || typeof container.querySelector !== "function") return null;
+    const host = findByCssPath(hostCss, container);
+    if (!host || !host.shadowRoot || host.shadowRoot.mode !== "open") return null;
     container = host.shadowRoot;
-  });
+  }
   return container;
 }
 
@@ -48,8 +51,17 @@ function findByCssPath(cssPath, doc) {
 
 function findByName(role, name, doc) {
   doc = doc || document;
-  const matches = Array.from(doc.querySelectorAll(INTERACTIVE_SELECTOR))
-    .filter((el) => !hasInteractiveDescendant(el) && isVisible(el) && computeRole(el) === role);
+  const scan = (container) => {
+    if (!container || typeof container.querySelectorAll !== "function") return [];
+    return Array.from(container.querySelectorAll(INTERACTIVE_SELECTOR))
+      .filter((el) => !hasInteractiveDescendant(el) && isVisible(el) && computeRole(el) === role);
+  };
+  const matches = scan(doc);
+  for (const root of shadowTools.collectOpenShadowRoots(doc)) {
+    for (const el of scan(root)) {
+      if (!matches.some((m) => m === el)) matches.push(el);
+    }
+  }
   const exact = matches.find((el) => computeAccessibleName(el) === name);
   if (exact) return exact;
   const prefix = matches.find((el) => {
@@ -68,11 +80,20 @@ function findByRect(target, doc) {
   doc = doc || document;
   const cx = target.boundingBox.x + target.boundingBox.w / 2;
   const cy = target.boundingBox.y + target.boundingBox.h / 2;
-  const matches = Array.from(doc.querySelectorAll(INTERACTIVE_SELECTOR))
-    .filter((el) => !hasInteractiveDescendant(el) && isVisible(el));
+  const scan = (container) => {
+    if (!container || typeof container.querySelectorAll !== "function") return [];
+    return Array.from(container.querySelectorAll(INTERACTIVE_SELECTOR))
+      .filter((el) => !hasInteractiveDescendant(el) && isVisible(el));
+  };
+  const all = scan(doc);
+  for (const root of shadowTools.collectOpenShadowRoots(doc)) {
+    for (const el of scan(root)) {
+      if (!all.some((m) => m === el)) all.push(el);
+    }
+  }
   let best = null;
   let bestDist = Infinity;
-  matches.forEach((el) => {
+  all.forEach((el) => {
     const r = el.getBoundingClientRect();
     const d = Math.hypot(r.x + r.width / 2 - cx, r.y + r.height / 2 - cy);
     if (d < bestDist) { bestDist = d; best = el; }

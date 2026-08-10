@@ -266,12 +266,12 @@ function assertEq(got, want, name) {
   const sh2 = { nodeType: 1, tagName: "BUTTON", id: "", parentNode: sh1, children: [] };
   sh0.children = [sh1]; sh1.children = [sh2];
   assertEq(snapshotMod.buildCssPath(sh2), "div > div > button", "buildCssPath chains tags");
-  const shadowRootMock = { mode: "open", isShadowRoot: true };
+  const shadowRootMock = { mode: "open", isShadowRoot: true, querySelector: () => null };
   const shadowHost = { nodeType: 1, shadowRoot: shadowRootMock };
-  const evalDoc = { evaluate: () => ({ singleNodeValue: shadowHost }) };
-  const resolved = locatorMod.resolveShadowPath(evalDoc, ["//*[@id='host']"]);
+  const cssDoc = { querySelector: (sel) => (sel === "#host" ? shadowHost : null) };
+  const resolved = locatorMod.resolveShadowPath(cssDoc, ["#host"]);
   assert(resolved === shadowRootMock, "resolveShadowPath descends into open shadow root");
-  assert(locatorMod.resolveShadowPath(evalDoc, []) === evalDoc, "resolveShadowPath empty path stays on container");
+  assert(locatorMod.resolveShadowPath(cssDoc, []) === cssDoc, "resolveShadowPath empty path stays on container");
   const shadowBtn = { tagName: "BUTTON" };
   const sroot = { querySelector: (sel) => (sel === "#shadow-btn" ? shadowBtn : null) };
   assert(locatorMod.findByCssPath("#shadow-btn", sroot) === shadowBtn, "findByCssPath works on ShadowRoot-like container");
@@ -299,6 +299,16 @@ function assertEq(got, want, name) {
   const cssHost1 = { nodeType: 1, tagName: "DIV", id: "hostB", parentNode: null };
   assertEq(snapshotMod.buildCssPath(cssHost0), "#hostA", "shadow host cssPath uses id");
   assertEq(snapshotMod.buildCssPath(cssHost1), "#hostB", "nested shadow host cssPath uses id");
+
+  // ── resolveShadowPath 用 cssPath 下钻，ShadowRoot 上无 evaluate 也能穿透嵌套 ──
+  const innerBtn = { tagName: "BUTTON" };
+  const innerRoot2 = { mode: "open", querySelector: (sel) => (sel === "#btn" ? innerBtn : null) };
+  const innerHost2 = { nodeType: 1, shadowRoot: innerRoot2, querySelector: () => null };
+  const nestOuterRoot = { mode: "open", querySelector: (sel) => (sel === "#inner" ? innerHost2 : null) };
+  const nestOuterHost = { nodeType: 1, shadowRoot: nestOuterRoot };
+  const docForNested = { querySelector: (sel) => (sel === "#outer" ? nestOuterHost : null) };
+  const nestedResolved = locatorMod.resolveShadowPath(docForNested, ["#outer", "#inner"]);
+  assert(nestedResolved === innerRoot2, "resolveShadowPath descends two shadow levels via cssPath", String(!!nestedResolved));
 
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
   const wfSaved = global.document;
