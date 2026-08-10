@@ -1557,6 +1557,19 @@ function assertEq(got, want, name) {
     assert(pw === controls[0], "password maps to the bare 密码 field, not 确认密码");
   }
 
+  // scenario 6: collectFormControls collects controls inside open shadow roots.
+  {
+    const ffShadowInput = { tagName: "INPUT", value: "", checked: false, type: "text", offsetParent: {}, getClientRects: () => [1], form: null, dispatchEvent: () => {}, focus: () => {}, getAttribute: () => null, closest: () => null };
+    const ffShadowRoot = { mode: "open", querySelectorAll: () => [ffShadowInput], querySelector: () => null };
+    const ffShadowHost = { nodeType: 1, shadowRoot: ffShadowRoot };
+    const ffShadowDoc = { querySelectorAll: (sel) => (sel === "*" ? [ffShadowHost] : []), querySelector: () => null };
+    const savedDoc = global.document;
+    global.document = ffShadowDoc;
+    const shadowControls = contentExecMod.collectFormControls();
+    global.document = savedDoc;
+    assert(shadowControls.some((c) => c.el === ffShadowInput), "collectFormControls collects inputs inside open shadow root", String(shadowControls.length));
+  }
+
   global.document = savedGlobal;
   global.Event = savedEvent;
   global.MouseEvent = savedMouseEvent;

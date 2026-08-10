@@ -1,4 +1,10 @@
 // DOM action executor. Receives { name, target, args }, relocates target via locator.
+// shadow.js 由 manifest 在 locator.js 之前注入（globalThis.shadowTools 已赋值）；
+// 独立测试页不加载 shadow.js 时降级为空工具。注意 content script 共享全局词法环境，
+// locator.js 已声明顶层 const shadowTools，此处必须用不同变量名，否则浏览器报
+// "Identifier 'shadowTools' has already been declared"。
+const shadowToolsRef = (typeof require === "function" ? require("./shadow.js") : globalThis.shadowTools)
+  || { collectOpenShadowRoots: () => [], walkShadowTree: () => {}, findElementInShadows: () => null };
 function setNativeValue(el, value) {
   let proto;
   if (el.tagName === "TEXTAREA") proto = HTMLTextAreaElement.prototype;
@@ -188,9 +194,18 @@ async function executeAction(action) {
 
 // ── form_fill: batch-fill a form from semantic field keys ──
 function collectFormControls() {
-  const all = Array.from(document.querySelectorAll(
-    "input, textarea, select, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='checkbox'], [role='radio']"
-  ));
+  const scan = (container) => {
+    if (!container || typeof container.querySelectorAll !== "function") return [];
+    return Array.from(container.querySelectorAll(
+      "input, textarea, select, [contenteditable='true'], [role='textbox'], [role='combobox'], [role='checkbox'], [role='radio']"
+    ));
+  };
+  const all = scan(document);
+  for (const root of shadowToolsRef.collectOpenShadowRoots(document)) {
+    for (const el of scan(root)) {
+      if (!all.some((m) => m === el)) all.push(el);
+    }
+  }
   const visible = all.filter((el) => el.offsetParent !== null || el.getClientRects().length > 0);
   return visible.map((el) => {
     const role = (typeof computeRole === "function") ? computeRole(el) : (el.tagName === "SELECT" ? "combobox" : "textbox");
@@ -448,6 +463,14 @@ function extractPageText(maxChars) {
   if (frames.length && text.length < maxChars) {
     text = (text + "\n\n[iframe]\n" + frames.join("\n\n")).trim();
   }
+  // Append text from open shadow roots (component libraries hide UI text there).
+  for (const root of shadowToolsRef.collectOpenShadowRoots(document)) {
+    if (!root || !root.innerText) continue;
+    const t = (root.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+    if (t && text.length < maxChars) {
+      text = (text + "\n\n[shadow]\n" + t).trim();
+    }
+  }
   if (text.length > maxChars) text = text.slice(0, maxChars) + "\n…(truncated)";
   return { ok: true, value: { url: location.href, title: document.title, text } };
 }
@@ -516,14 +539,21 @@ const sleepMs = (ms) => new Promise((r) => setTimeout(r, ms));
 function waitForCondition(args) {
   const timeout = Math.max(0, args.timeout || 8000);
   const start = Date.now();
+  const hasText = (doc) => {
+    if (doc.body && doc.body.innerText && doc.body.innerText.includes(args.text)) return true;
+    for (const root of shadowToolsRef.collectOpenShadowRoots(doc)) {
+      if (root.innerText && root.innerText.includes(args.text)) return true;
+    }
+    return false;
+  };
   const matches = (doc) => {
     if (args.selector) {
-      const found = doc.querySelector(args.selector) != null;
+      const found = shadowToolsRef.findElementInShadows(args.selector, doc) != null;
       if (args.disappear && !found) return true;
       if (!args.disappear && found) return true;
     }
     if (args.text) {
-      const has = (doc.body && doc.body.innerText && doc.body.innerText.includes(args.text)) || false;
+      const has = hasText(doc);
       if (args.disappear && !has) return true;
       if (!args.disappear && has) return true;
     }
