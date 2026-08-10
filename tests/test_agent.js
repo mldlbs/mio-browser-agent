@@ -871,6 +871,32 @@ function assertEq(got, want, name) {
   assert(replanned === 1, "executor replans after repeated failures");
   assert(res2.ok, "executor completes after replan");
 
+  // ── executor 返回步骤事件流（失败透明度数据源）──
+  const evBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [] }),
+    executeAction: async () => ({ ok: false, error: "boom" }),
+  };
+  const evLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 0 })] }),
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }),
+  ]);
+  const evRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "点按钮" }] },
+    {
+      llm: evLlm, bridge: evBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {},
+      replan: async () => { throw new Error("no replan"); },
+      maxTurns: 5, maxStepRetries: 3, isStopped: () => false,
+    }
+  );
+  assert(Array.isArray(evRes.events), "execute returns events array");
+  assert(evRes.events.some((e) => e.type === "step_start" && e.description === "点按钮"), "events contain step_start");
+  assert(evRes.events.some((e) => e.type === "step_done"), "events contain step_done");
+  assert(evRes.events.some((e) => e.type === "recovery" && e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "events contain recovery error for failed tool");
+  assert(evRes.events.some((e) => e.type === "recovery" && e.kind === "attempt" && e.ok), "events contain recovery attempt");
+  assert(evRes.events.some((e) => e.type === "tool_failed" && e.name === "click"), "events contain tool_failed for failed tool");
+
   // ── multi-step replan resumes from the failed step, not step 0 ──
   // stepA completes, stepB keeps failing until replan; replan receives the
   // completed-step list (done=["A"]) so the planner avoids redoing step A.
