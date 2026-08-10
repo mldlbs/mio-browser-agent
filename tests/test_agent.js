@@ -224,6 +224,29 @@ function assertEq(got, want, name) {
   assert(ext.value.url === "https://novel.example/ch1", "extractPageText includes url");
   assert(ext.value.text.length <= 120, "extractPageText caps length");
 
+  // ── extractPageText: appends text from open shadow roots via textContent ──
+  const shadowRootMock2 = {
+    mode: "open",
+    isShadowRoot: true,
+    textContent: "shadow 内按钮：确认提交",
+    querySelectorAll: () => [],
+    querySelector: () => null,
+  };
+  const shadowHost2 = { nodeType: 1, shadowRoot: shadowRootMock2, querySelectorAll: () => [] };
+  global.document = {
+    title: "shadow 页面",
+    body: { innerText: "正文内容", cloneNode: () => ({ querySelectorAll: () => [], innerText: "正文内容" }) },
+    querySelector: () => null,
+    querySelectorAll: (sel) => (sel === "iframe" ? [] : sel === "*" ? [shadowHost2] : []),
+  };
+  global.location = { href: "https://novel.example/shadow" };
+  const extShadow = contentExecMod.extractPageText(1000);
+  global.document = savedDoc;
+  global.location = savedLoc;
+  assert(extShadow.ok, "extractPageText with shadow root returns ok");
+  assert(extShadow.value.text.includes("[shadow]"), "extractPageText appends [shadow] section");
+  assert(extShadow.value.text.includes("确认提交"), "extractPageText includes shadow root textContent");
+
   // ── pasteText: writes into contenteditable and textarea ──
   let editableText = "";
   const editable = {
@@ -332,6 +355,26 @@ function assertEq(got, want, name) {
   const wfOk = await contentExecMod.waitForCondition({ text: "加载完成", timeout: 500 });
   global.document = wfSaved;
   assert(wfOk.ok, "waitForCondition succeeds when text present");
+
+  // ── waitForCondition: matches text inside open shadow root via textContent ──
+  const wfShadowRoot = {
+    mode: "open",
+    isShadowRoot: true,
+    textContent: "弹窗内：加载完成",
+    querySelectorAll: () => [],
+    querySelector: () => null,
+  };
+  const wfShadowHost = { nodeType: 1, shadowRoot: wfShadowRoot, querySelectorAll: () => [] };
+  const wfShadowDoc = {
+    body: { innerText: "" },
+    querySelector: () => null,
+    querySelectorAll: (sel) => (sel === "iframe" ? [] : sel === "*" ? [wfShadowHost] : []),
+  };
+  global.document = wfShadowDoc;
+  global.location = { href: "https://x.example/page" };
+  const wfShadow = await contentExecMod.waitForCondition({ text: "加载完成", timeout: 100 });
+  global.document = wfSaved;
+  assert(wfShadow.ok, "waitForCondition matches text inside open shadow root");
 
   // ── snapshotStats summary ──
   const stats = protocol.snapshotStats(snap);

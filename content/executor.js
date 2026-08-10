@@ -465,8 +465,8 @@ function extractPageText(maxChars) {
   }
   // Append text from open shadow roots (component libraries hide UI text there).
   for (const root of shadowToolsRef.collectOpenShadowRoots(document)) {
-    if (!root || !root.innerText) continue;
-    const t = (root.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
+    if (!root || !root.textContent) continue;
+    const t = (root.textContent || "").replace(/\n{3,}/g, "\n\n").trim();
     if (t && text.length < maxChars) {
       text = (text + "\n\n[shadow]\n" + t).trim();
     }
@@ -542,7 +542,7 @@ function waitForCondition(args) {
   const hasText = (doc) => {
     if (doc.body && doc.body.innerText && doc.body.innerText.includes(args.text)) return true;
     for (const root of shadowToolsRef.collectOpenShadowRoots(doc)) {
-      if (root.innerText && root.innerText.includes(args.text)) return true;
+      if (root.textContent && root.textContent.includes(args.text)) return true;
     }
     return false;
   };
