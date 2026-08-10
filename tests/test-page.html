@@ -35,6 +35,8 @@
     <button id="sf-submit" type="submit">提交</button>
   </form>
   <div id="shadow-host"></div>
+  <div id="nested-shadow-host"></div>
+  <div id="shadow-form-host"></div>
   <div id="results"></div>
   <label for="input-captcha">验证码</label>
   <input id="input-captcha" type="text" placeholder="请输入验证码">
@@ -59,11 +61,33 @@
         '<input id="shadow-input" type="text" placeholder="shadow输入框">';
       const vt = document.getElementById("vision-target");
       if (vt) vt.addEventListener("pointerdown", () => { window.__visionClicks = (window.__visionClicks || 0) + 1; });
+      // nested shadow: outer open root → inner open root → button/input (3 levels)
+      const nestHost = document.getElementById("nested-shadow-host");
+      const nestRoot = nestHost.attachShadow({ mode: "open" });
+      const innerHost = document.createElement("div");
+      innerHost.id = "shadow-inner-host";
+      nestRoot.appendChild(innerHost);
+      const innerRoot = innerHost.attachShadow({ mode: "open" });
+      innerRoot.innerHTML =
+        '<input id="nested-input" type="text" placeholder="嵌套shadow输入框">' +
+        '<button id="nested-btn" onclick="window.__nestedClicks=(window.__nestedClicks||0)+1">嵌套幽灵按钮</button>';
+      // shadow form: form + username/password + checkbox + submit inside one root
+      const formHost = document.getElementById("shadow-form-host");
+      const formRoot = formHost.attachShadow({ mode: "open" });
+      formRoot.innerHTML =
+        '<form id="shadow-form" onsubmit="window.__shadowFormSubmitted=(window.__shadowFormSubmitted||0)+1; return false;">' +
+        '<label for="sf2-username">用户名</label>' +
+        '<input id="sf2-username" type="text" name="username" placeholder="shadow用户名">' +
+        '<label for="sf2-password">密码</label>' +
+        '<input id="sf2-password" type="password" name="password" placeholder="shadow密码">' +
+        '<label><input id="sf2-agree" type="checkbox" name="agree"> 同意shadow</label>' +
+        '<button id="sf2-submit" type="submit">shadow登录</button></form>';
     })();
   </script>
 
   <script src="../common/protocol.js"></script>
   <script src="../common/fields.js"></script>
+  <script src="../content/shadow.js"></script>
   <script src="../content/snapshot.js"></script>
   <script src="../content/locator.js"></script>
   <script src="../content/executor.js"></script>

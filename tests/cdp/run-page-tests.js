@@ -84,6 +84,35 @@ const { openTab, runInPage, report } = require("./page-runner");
       const sClick = await executeAction({ name: "click", target: sbtn, args: {} });
       check(sClick.ok && window.__shadowClicks === 1, "executor clicks button inside shadow root", sClick.ok);
 
+      // 嵌套 shadow：3 层穿透（document → root → root）快照/定位/点击/输入
+      const nsBtn = snap.elements.find((e) => e.name && e.name.includes("嵌套幽灵按钮"));
+      check(!!nsBtn && nsBtn.shadowPath.length === 2, "snapshot captures nested shadow button (shadowPath depth 2)", nsBtn && JSON.stringify(nsBtn.shadowPath));
+      const nsInput = snap.elements.find((e) => e.placeholder === "嵌套shadow输入框");
+      check(!!nsInput && nsInput.shadowPath.length === 2, "snapshot captures nested shadow input", nsInput && JSON.stringify(nsInput.shadowPath));
+      const nsLoc = locateElement(nsBtn);
+      check(!!nsLoc && nsLoc.id === "nested-btn", "locator resolves nested shadow element via cssPath shadowPath", nsLoc && nsLoc.id);
+      window.__nestedClicks = 0;
+      const nsClick = await executeAction({ name: "click", target: nsBtn, args: {} });
+      check(nsClick.ok && window.__nestedClicks === 1, "executor clicks button 2 levels deep in shadow", nsClick.ok);
+      const nsType = await executeAction({ name: "type", target: nsInput, args: { text: "deep", clear: true } });
+      const nsInputEl = document.getElementById("nested-shadow-host").shadowRoot.getElementById("shadow-inner-host").shadowRoot.getElementById("nested-input");
+      check(nsType.ok && nsInputEl.value === "deep", "executor types into nested shadow input", nsInputEl && nsInputEl.value);
+
+      // shadow 表单：form_fill 一次填完并提交
+      window.__shadowFormSubmitted = 0;
+      const ffShadowRes = await executeAction({ name: "form_fill", target: null, args: { fields: { "shadow用户名": "shadowu", "shadow密码": "shadowp", "同意shadow": true }, submit: true } });
+      const shadowForm = document.getElementById("shadow-form-host").shadowRoot.getElementById("shadow-form");
+      const sfUser = shadowForm.querySelector("#sf2-username");
+      const sfPass = shadowForm.querySelector("#sf2-password");
+      const sfAgree = shadowForm.querySelector("#sf2-agree");
+      check(ffShadowRes.ok && sfUser.value === "shadowu" && sfPass.value === "shadowp", "form_fill fills shadow form fields", JSON.stringify(ffShadowRes));
+      check(sfAgree.checked === true, "form_fill checks checkbox inside shadow root", String(sfAgree.checked));
+      check(window.__shadowFormSubmitted === 1, "form_fill submits the shadow form", String(window.__shadowFormSubmitted));
+
+      // waitForCondition text inside shadow root is detected
+      const wfShadow = await executeAction({ name: "waitFor", target: null, args: { text: "shadow登录", timeout: 500 } });
+      check(wfShadow.ok, "waitForCondition finds text inside open shadow root", (wfShadow && wfShadow.error) || "");
+
       // Canvas captcha：快照收录 + 可定位 + 可点击（登录验证码场景）
       const cap = snap.elements.find((e) => e.tag === "canvas");
       check(!!cap, "snapshot captures canvas captcha element", cap && JSON.stringify(cap));
