@@ -349,6 +349,7 @@
 | form_fill | 1 本地登录表单 | 语义字段+select+checkbox+提交 | ⭐⭐⭐⭐⭐ |
 | form_fill | 2 真实站多表单 | 表单作用域+空值+弱关键词 | ⭐⭐⭐⭐⭐ |
 | form_fill | 3 React 受控表单 | checkbox 同步+受控输入 | ⭐⭐⭐⭐ |
+| form_fill | 4 shadow 表单 | 穿透 open shadow root 填表+提交 | ⭐⭐⭐⭐ |
 
 ---
 
@@ -415,6 +416,25 @@
 | 文本填充 | 文本字段正确填入（React 受控 input 不同步时值已写入） |
 
 **失败信号**：checkbox 视觉勾了但提交数据里是 false（React 状态未同步——正是 v0.1.39 修复的问题）、文本输入框值被 React 重置。
+
+### 任务 4 · 中阶（shadow DOM 表单）
+
+```
+打开一个用 Web Components / 组件库构建的含表单页面（如 MUI 组件的 TextField 示例页，或任意将表单放进 open shadow root 的站），用表单填充填写字段（用户名、密码）并勾选一个复选框，确认提交生效。
+```
+
+**期望行为**：`form_fill` 穿透 open shadow root 找到字段 → 填充 → 勾选 → 提交。
+
+**验收标准**
+
+| 项 | 通过条件 |
+|----|----------|
+| 字段识别 | shadow 内字段按 label/placeholder 语义匹配（含中文同义词） |
+| 嵌套穿透 | shadow 套 shadow（深度 ≥2）的元素也能定位/操作 |
+| 受控同步 | shadow 内 checkbox 勾选状态正确同步 |
+| 提交 | 提交动作落在 shadow 内表单，非页面其它表单 |
+
+**失败信号**：shadow 内字段 not_found、form_fill 报 FIELD_NOT_FOUND、checkbox 勾了但提交数据为 false、嵌套 shadow 元素无法定位。
 
 ---
 
