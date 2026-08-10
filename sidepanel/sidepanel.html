@@ -313,6 +313,9 @@
     .plan-step.running .plan-num { border-color: var(--mauve); color: var(--mauve); animation: pulse 1.4s infinite; }
     .plan-step.failed .plan-num { background: rgba(243,139,168,.15); border-color: rgba(243,139,168,.4); color: var(--red); }
     .plan-step.failed { color: var(--red); }
+    .plan-step.failed { cursor: pointer; }
+    .plan-step.failed:hover { background: rgba(243, 139, 168, 0.12); }
+    .step-failure-detail { margin: 2px 0 6px 24px; padding: 6px 10px; background: rgba(243, 139, 168, 0.06); border-left: 2px solid #f38ba8; border-radius: 4px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; color: #cdd6f4; }
 
     /* log */
     .log-wrap {

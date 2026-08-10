@@ -5,6 +5,7 @@ let currentTask = null;
 let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
 let _historyPage = 0;
+let expandedFailureStep = null;
 
 function resetPlanProgress() {
   planProgress = { steps: [], done: [], failed: [], replanned: false };
@@ -42,6 +43,12 @@ function renderPlanPanel() {
       : i === planProgress.current ? " running"
       : "";
     row.className = "plan-step" + cls;
+    if (planProgress.failed.includes(i)) {
+      row.addEventListener("click", () => {
+        expandedFailureStep = expandedFailureStep === i ? null : i;
+        renderPlanPanel();
+      });
+    }
     const num = document.createElement("span");
     num.className = "plan-num";
     num.textContent = planProgress.done.includes(i) ? "✓"
@@ -54,6 +61,18 @@ function renderPlanPanel() {
     row.appendChild(num);
     row.appendChild(label);
     list.appendChild(row);
+    if (planProgress.failed.includes(i) && expandedFailureStep === i) {
+      const detail = document.createElement("div");
+      detail.className = "step-failure-detail";
+      const events = (currentTask && currentTask.stepEvents || []).filter((e) =>
+        e.type === "recovery" && e.stepIndex === i
+      );
+      const narrative = events.length
+        ? RecoveryEventsModule.renderStepFailure(events)
+        : "无恢复记录";
+      detail.textContent = narrative;
+      list.appendChild(detail);
+    }
   });
   panel.appendChild(list);
 }
@@ -261,8 +280,6 @@ function exportOneHistory(r) {
 
 async function historyLog(goal) {
   if (!currentTask) return;
-  const evRendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
-  if (evRendered) currentTask.logs.push({ tag: "recover", text: evRendered, ts: Date.now() });
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
   await HistoryModule.addHistoryRecord(currentTask);
   currentTask = null;
@@ -473,16 +490,13 @@ async function startTask(resume) {
     },
     onRecovery: (ev) => {
       if (!currentTask) return;
-      RecoveryEventsModule.addEvent(currentTask.recoveryEvents, ev);
-      const rendered = RecoveryEventsModule.renderEventStream(currentTask.recoveryEvents);
-      appendLog("recover", rendered.split("\n")[0] || "恢复");
-      const msg = document.createElement("div");
-      msg.className = "recovery-event";
-      const pre = document.createElement("pre");
-      pre.textContent = rendered;
-      msg.appendChild(pre);
-      $("log").appendChild(msg);
-      $("log").scrollTop = $("log").scrollHeight;
+      currentTask.recoveryEvents = RecoveryEventsModule.addEvent(currentTask.recoveryEvents, ev);
+      if (ev.kind === "error") {
+        const stepNum = typeof ev.stepId === "number" && isFinite(ev.stepId) ? ev.stepId + 1 : ev.stepId;
+        appendLog("recover", `步骤 ${stepNum} ❌ ${ev.code}${ev.message ? ": " + ev.message : ""}`);
+      } else if (ev.kind === "outcome" && ev.outcome === "exhausted") {
+        appendLog("recover", "✗ 恢复用尽，步骤失败（点击计划面板失败步骤查看详情）");
+      }
     },
     onCheckpoint: (cp) => { if (currentTask) currentTask.resume = cp; },
     onProgress: (p) => {
@@ -512,10 +526,10 @@ async function startTask(resume) {
 
   try {
     const result = await runtime.run(goal, resume);
-    const m = (globalThis.MetricsModule && globalThis.MetricsModule.getMetrics) ? globalThis.MetricsModule.getMetrics() : {};
     currentTask.status = result.ok ? "done" : "error";
-    currentTask.recoveries = m.recoveryCount || 0;
-    currentTask.replans = m.replanCount || 0;
+    currentTask.stepEvents = (result && result.events) || currentTask.stepEvents || [];
+    currentTask.recoveries = currentTask.stepEvents.filter((e) => e.type === "recovery" && e.kind === "error").length;
+    currentTask.replans = currentTask.stepEvents.filter((e) => e.type === "replan").length;
     currentTask.finishedAt = Date.now();
     if (!result.ok && result.resume) currentTask.resume = result.resume;
     await historyLog(goal);
