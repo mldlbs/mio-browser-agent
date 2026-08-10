@@ -196,6 +196,60 @@ function assertEq(got, want, name) {
   };
   assertEq(snapshotMod.computeAccessibleName(plainImg), "图片", "plain img falls back to 图片");
 
+  // ── shadow root 内 label 关联：associatedLabel/labelledBy 从 getRootNode 查询 ──
+  global.CSS = global.CSS || { escape: (s) => s };
+  const shadowLabel = { textContent: "shadow用户名" };
+  const shadowRootForLabel = {
+    getElementById: (id) => (id === "sf2-username" ? shadowLabel : null),
+    querySelector: (sel) => (sel === 'label[for="sf2-username"]' ? shadowLabel : null),
+  };
+  const shadowInputForLabel = {
+    tagName: "INPUT",
+    id: "sf2-username",
+    getAttribute: (a) => (a === "id" ? "sf2-username" : a === "aria-label" ? null : a === "placeholder" ? "shadow用户名" : null),
+    getRootNode: () => shadowRootForLabel,
+    closest: () => null,
+    isContentEditable: false,
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.associatedLabel(shadowInputForLabel), "shadow用户名", "associatedLabel finds label inside shadow root");
+  assertEq(snapshotMod.computeAccessibleName(shadowInputForLabel), "shadow用户名", "computeAccessibleName uses shadow root label (not placeholder fallback)");
+
+  // labelledBy inside shadow root: aria-labelledby resolves within the element's own root
+  const shadowLabelBy = { textContent: "shadow昵称" };
+  const shadowRootForLabelledBy = {
+    getElementById: (id) => (id === "sf-nick" ? shadowLabelBy : null),
+  };
+  const shadowInputForLabelledBy = {
+    tagName: "INPUT",
+    getAttribute: (a) => (a === "aria-labelledby" ? "sf-nick" : null),
+    getRootNode: () => shadowRootForLabelledBy,
+    closest: () => null,
+    isContentEditable: false,
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.labelledBy(shadowInputForLabelledBy), "shadow昵称", "labelledBy resolves aria-labelledby inside shadow root");
+  assertEq(snapshotMod.computeAccessibleName(shadowInputForLabelledBy), "shadow昵称", "computeAccessibleName prefers labelledby inside shadow root");
+
+  // getRootNode 缺失时降级到 document（document 上仍有该 label）
+  const savedLegacyDoc = global.document;
+  global.document = {
+    querySelector: (sel) => (sel === 'label[for="legacy-user"]' ? { textContent: "旧文档用户名" } : null),
+  };
+  const legacyInput = {
+    tagName: "INPUT",
+    id: "legacy-user",
+    getAttribute: (a) => (a === "id" ? "legacy-user" : null),
+    closest: () => null,
+    isContentEditable: false,
+    innerText: "",
+    textContent: "",
+  };
+  assertEq(snapshotMod.associatedLabel(legacyInput), "旧文档用户名", "associatedLabel falls back to document when getRootNode missing");
+  global.document = savedLegacyDoc;
+
   // ── annotatePositions: icon buttons near a textbox get a position hint ──
   const posElems = [
     { index: 0, role: "textbox", name: "输入框(占位: 给 DeepSeek 发送消息 )", boundingBox: { x: 0, y: 100, w: 300, h: 40 } },

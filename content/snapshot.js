@@ -21,18 +21,24 @@ function textOf(el) {
   return (el.innerText || el.textContent || "").trim();
 }
 
+function elementRoot(el) {
+  return (typeof el.getRootNode === "function" && el.getRootNode()) || document;
+}
+
 function labelledBy(el) {
   const id = el.getAttribute("aria-labelledby");
   if (!id) return "";
+  const root = elementRoot(el);
   return id.split(/\s+/).map((i) => {
-    const ref = document.getElementById(i);
+    const ref = root.getElementById(i);
     return ref ? textOf(ref) : "";
   }).filter(Boolean).join(" ");
 }
 
 function associatedLabel(el) {
+  const root = elementRoot(el);
   if (el.id) {
-    const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+    const l = root.querySelector(`label[for="${CSS.escape(el.id)}"]`);
     if (l) return textOf(l);
   }
   const parent = el.closest("label");
@@ -298,5 +304,5 @@ function positionRelativeTo(box, inputs) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { captureSnapshot, captureFrameSnapshot, computeRole, computeAccessibleName, isVisible, hasInteractiveDescendant, buildCssPath, annotatePositions };
+  module.exports = { captureSnapshot, captureFrameSnapshot, computeRole, computeAccessibleName, labelledBy, associatedLabel, isVisible, hasInteractiveDescendant, buildCssPath, annotatePositions };
 }
