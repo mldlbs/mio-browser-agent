@@ -1,6 +1,8 @@
 // Multi-strategy element relocation. Strategy order: xpath → role+name → rect.
 // iframe-aware: target.framePath (array of iframe indexes) selects the document.
-const shadowTools = (typeof require === "function") ? require("./shadow.js") : globalThis.shadowTools;
+// shadow.js 先于本文件注入（manifest 保证）；独立测试页若不加载则降级为空工具
+const shadowTools = (typeof require === "function" ? require("./shadow.js") : globalThis.shadowTools)
+  || { collectOpenShadowRoots: () => [], walkShadowTree: () => {}, findElementInShadows: () => null };
 function resolveFrameDoc(framePath) {
   let doc = document;
   (framePath || []).forEach((fi) => {

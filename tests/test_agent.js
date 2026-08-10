@@ -310,6 +310,15 @@ function assertEq(got, want, name) {
   const nestedResolved = locatorMod.resolveShadowPath(docForNested, ["#outer", "#inner"]);
   assert(nestedResolved === innerRoot2, "resolveShadowPath descends two shadow levels via cssPath", String(!!nestedResolved));
 
+  // resolveShadowPath 失败路径：closed root / 宿主缺失 / 非 querySelector 容器
+  const closedHost = { shadowRoot: { mode: "closed" } };
+  const docClosed = { querySelector: () => closedHost };
+  assert(locatorMod.resolveShadowPath(docClosed, ["#host"]) === null, "resolveShadowPath rejects closed shadow root", String(!!locatorMod.resolveShadowPath(docClosed, ["#host"])));
+  const docMiss = { querySelector: () => null };
+  assert(locatorMod.resolveShadowPath(docMiss, ["#nope"]) === null, "resolveShadowPath null when host missing", String(!!locatorMod.resolveShadowPath(docMiss, ["#nope"])));
+  assert(locatorMod.resolveShadowPath({}, ["#host"]) === null, "resolveShadowPath null on non-querySelector container", String(!!locatorMod.resolveShadowPath({}, ["#host"])));
+  assert(locatorMod.resolveShadowPath(docMiss, []) === docMiss, "resolveShadowPath empty shadowPath keeps container", String(locatorMod.resolveShadowPath(docMiss, []) === docMiss));
+
   // ── waitForCondition: text appears → ok; timeout → WAIT_TIMEOUT ──
   const wfSaved = global.document;
   const wfMockDoc = { body: { innerText: "" }, querySelector: () => null, querySelectorAll: () => [] };
