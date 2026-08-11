@@ -4,5 +4,8 @@ node_modules/
 Thumbs.db
 *.egg-info/
 
+# sync server runtime data
+server/data/
+
 # internal design decisions, not part of the public repo
 docs/adr/
