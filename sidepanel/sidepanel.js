@@ -181,6 +181,36 @@ async function renderAuthState() {
   }
 }
 
+function wireAuthPopupListeners() {
+  $("authRegister").addEventListener("click", async () => {
+    const email = $("authEmail").value.trim();
+    const password = $("authPassword").value;
+    const serverUrl = $("authServer").value.trim();
+    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
+    try {
+      await AuthClient.register(email, password, serverUrl);
+      $("authPopup").hidden = true;
+      await renderAuthState();
+      toast("注册成功");
+    } catch (e) {
+      toast("注册失败: " + (e && e.status === 409 ? "邮箱已注册" : "无法连接服务器"));
+    }
+  });
+  $("authLogin").addEventListener("click", async () => {
+    const email = $("authEmail").value.trim();
+    const password = $("authPassword").value;
+    const serverUrl = $("authServer").value.trim();
+    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
+    try {
+      await AuthClient.login(email, password, serverUrl);
+      $("authPopup").hidden = true;
+      await renderAuthState();
+      toast("登录成功");
+    } catch (e) {
+      toast("登录失败: " + (e && e.status === 401 ? "邮箱或密码错误" : "无法连接服务器"));
+    }
+  });
+}
 async function init() {
   const verEl = $("version");
   if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
@@ -238,36 +268,6 @@ async function init() {
     }
   });
 
-  function wireAuthPopupListeners() {
-    $("authRegister").addEventListener("click", async () => {
-      const email = $("authEmail").value.trim();
-      const password = $("authPassword").value;
-      const serverUrl = $("authServer").value.trim();
-      if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
-      try {
-        await AuthClient.register(email, password, serverUrl);
-        $("authPopup").hidden = true;
-        await renderAuthState();
-        toast("注册成功");
-      } catch (e) {
-        toast("注册失败: " + (e && e.status === 409 ? "邮箱已注册" : "无法连接服务器"));
-      }
-    });
-    $("authLogin").addEventListener("click", async () => {
-      const email = $("authEmail").value.trim();
-      const password = $("authPassword").value;
-      const serverUrl = $("authServer").value.trim();
-      if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
-      try {
-        await AuthClient.login(email, password, serverUrl);
-        $("authPopup").hidden = true;
-        await renderAuthState();
-        toast("登录成功");
-      } catch (e) {
-        toast("登录失败: " + (e && e.status === 401 ? "邮箱或密码错误" : "无法连接服务器"));
-      }
-    });
-  }
 
   $("start").addEventListener("click", startTask);
   $("stop").addEventListener("click", () => { if (runtime) runtime.stop(); });
