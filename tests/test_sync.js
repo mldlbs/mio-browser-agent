@@ -8,39 +8,16 @@ async function run() {
   }
   function assertOk(cond, msg) { if (cond) pass++; else { fail++; console.error("FAIL " + msg); } }
 
-  // deriveKey 幂等
-  const k1 = await sync.deriveKey("test-key");
-  const k2 = await sync.deriveKey("test-key");
-  assertEq(k1, k2, "deriveKey deterministic");
-
-  // 加密往返
-  const rec = { id: "a1", goal: "任务", status: "done", finishedAt: 1000, logs: [] };
-  const bundle = await sync.encryptRecord(rec, k1);
-  assertOk(bundle.ciphertext && bundle.iv, "encryptRecord produces ciphertext+iv");
-  assertEq(bundle.id, "a1", "bundle carries id");
-  assertEq(bundle.updatedAt, 1000, "updatedAt = finishedAt");
-  const back = await sync.decryptRecord(bundle, k1);
-  assertEq(back.goal, "任务", "roundtrip goal");
-
-  // 错误 key 解不开
-  const k3 = await sync.deriveKey("other-key");
-  let threw = false;
-  try { await sync.decryptRecord(bundle, k3); } catch (_) { threw = true; }
-  assertOk(threw, "wrong key fails decrypt");
-
-  // URL 拼装
+  // URL
   assertEq(sync.apiUrl("https://x.com", "records"), "https://x.com/v1/records", "apiUrl join");
   assertEq(sync.apiUrl("https://x.com/", "records/a1"), "https://x.com/v1/records/a1", "apiUrl strip trailing slash");
 
-  // sanitizeRecord: strips resume, keeps the rest
+  // sanitizeRecord
   const recWithResume = { id: "r9", goal: "t", status: "done", finishedAt: 9, logs: [], resume: { goal: "t", plan: [], nextStepIndex: 1, lastSummary: "s", notes: ["secret"] } };
   const sanitized = sync.sanitizeRecord(recWithResume);
   assertOk(!("resume" in sanitized), "sanitizeRecord strips resume");
   assertEq(sanitized.goal, "t", "sanitizeRecord keeps goal");
   assertOk("resume" in recWithResume, "sanitizeRecord does not mutate input");
-  const encSan = await sync.encryptRecord(sanitized, k1);
-  const decSan = await sync.decryptRecord(encSan, k1);
-  assertOk(!("resume" in decSan), "encrypted sanitized record has no resume");
 
   // mergeRecords: local-only
   {
@@ -82,41 +59,30 @@ async function run() {
     assertOk(res.merged.some((r) => r.id === "x" && r.finishedAt === 100), "equal timestamps merged keeps value");
   }
 
-  // tampered ciphertext fails AES-GCM auth
-  {
-    let threw = false;
-    try { await sync.decryptRecord({ id: "t1", updatedAt: 1000, ciphertext: "tampered", iv: bundle.iv }, k1); } catch (_) { threw = true; }
-    assertOk(threw, "tampered ciphertext fails decrypt");
-  }
-
-  // syncHistory 编排（mock fetch）
-  const historyKey = await sync.deriveKey("k");
-  const remoteBundle = await sync.encryptRecord({ id: "r1", goal: "新", finishedAt: 5000 }, historyKey);
+  // syncHistory mock
   const calls = [];
   global.fetch = async (url, opts) => {
-    calls.push({ url, method: opts && opts.method || "GET", key: opts && opts.headers && opts.headers["X-Api-Key"], body: opts && opts.body });
+    calls.push({ url, method: opts && opts.method || "GET", auth: opts && opts.headers && opts.headers["Authorization"], body: opts && opts.body });
     if (opts && opts.method === "PUT") return { ok: true, status: 200, json: async () => ({ ok: true }) };
-    return { ok: true, status: 200, json: async () => [remoteBundle] };
+    return { ok: true, status: 200, json: async () => [{ id: "r1", goal: "new", finishedAt: 5000 }] };
   };
   const local = [
-    { id: "r1", goal: "旧", finishedAt: 1000 },
-    { id: "r2", goal: "新本地", finishedAt: 2000, resume: { goal: "新本地", plan: [], nextStepIndex: 1, lastSummary: "s", notes: ["secret"] } },
+    { id: "r1", goal: "old", finishedAt: 1000 },
+    { id: "r2", goal: "newlocal", finishedAt: 2000, resume: { goal: "newlocal", plan: [], nextStepIndex: 1, lastSummary: "s", notes: ["secret"] } },
   ];
-  const res = await sync.syncHistory("https://srv", "k", local);
+  const res = await sync.syncHistory("https://srv", "my-token", local);
   assertOk(calls.some((c) => c.method === "GET"), "syncHistory lists remote");
   const puts = calls.filter((c) => c.method === "PUT");
   assertOk(puts.length >= 1, "syncHistory pushes missing local");
-  assertOk(puts.every((c) => c.key === "k"), "PUT carries api key");
+  assertOk(puts.every((c) => c.auth === "Bearer my-token"), "PUT carries Bearer token");
   assertOk(res.pulled >= 1, "pull reported");
   assertOk(calls.some((c) => c.method === "PUT" && c.url.endsWith("/v1/records/r2")), "PUT goes to encoded record URL");
-  assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).iv), "PUT carries ciphertext bundle (iv present)");
-  assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).updatedAt === 2000), "PUT carries updatedAt from local record");
+  assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).finishedAt === 2000), "PUT carries record fields");
   {
     const r2put = calls.find((c) => c.method === "PUT" && c.url.endsWith("/v1/records/r2"));
-    const bundle = JSON.parse(r2put.body);
-    const decrypted = await sync.decryptRecord(bundle, historyKey);
-    assertOk(!("resume" in decrypted), "syncHistory upload excludes resume");
-    assertEq(decrypted.goal, "新本地", "syncHistory upload keeps goal");
+    const body = JSON.parse(r2put.body);
+    assertOk(!("resume" in body), "syncHistory upload excludes resume");
+    assertEq(body.goal, "newlocal", "syncHistory upload keeps goal");
   }
   delete global.fetch;
 

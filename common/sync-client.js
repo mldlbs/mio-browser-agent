@@ -1,63 +1,7 @@
-const SALT = "mio-sync-v1";
-const PBKDF2_ITERATIONS = 100000;
-
-function b64u(buf) {
-  let bin = "";
-  const bytes = new Uint8Array(buf);
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-function unb64u(s) {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "====".slice(0, (4 - (s.length % 4)) % 4);
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-async function deriveKey(apiKey) {
-  const enc = new TextEncoder();
-  const base = await crypto.subtle.importKey("raw", enc.encode(apiKey), "PBKDF2", false, ["deriveKey"]);
-  const material = await crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: enc.encode(SALT), iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-    base,
-    { name: "AES-GCM", length: 256 },
-    true,
-    ["encrypt", "decrypt"]
-  );
-  const raw = await crypto.subtle.exportKey("raw", material);
-  return b64u(new Uint8Array(raw));
-}
-
-async function _rawKey(b64) {
-  return crypto.subtle.importKey("raw", unb64u(b64), "AES-GCM", false, ["encrypt", "decrypt"]);
-}
-
-async function encryptRecord(rec, keyB64) {
-  const k = await _rawKey(keyB64);
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = new TextEncoder().encode(JSON.stringify(rec));
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, data);
-  return {
-    id: rec.id,
-    updatedAt: rec.finishedAt || 0,
-    ciphertext: b64u(new Uint8Array(ct)),
-    iv: b64u(iv),
-  };
-}
-
 function sanitizeRecord(rec) {
   const out = Object.assign({}, rec);
   delete out.resume;
   return out;
-}
-
-async function decryptRecord(bundle, keyB64) {
-  const k = await _rawKey(keyB64);
-  const iv = unb64u(bundle.iv);
-  const ct = unb64u(bundle.ciphertext);
-  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, k, ct);
-  return JSON.parse(new TextDecoder().decode(pt));
 }
 
 function apiUrl(serverUrl, path) {
@@ -83,9 +27,9 @@ function mergeRecords(localList, remoteList) {
   return { merged, pulled, toPush };
 }
 
-async function _req(serverUrl, apiKey, path, method, body) {
+async function _req(serverUrl, token, path, method, body) {
   const url = apiUrl(serverUrl, path);
-  const headers = { "X-Api-Key": apiKey };
+  const headers = { "Authorization": "Bearer " + token };
   if (body) headers["Content-Type"] = "application/json";
   const resp = await fetch(url, {
     method: method || "GET",
@@ -100,31 +44,22 @@ async function _req(serverUrl, apiKey, path, method, body) {
   return resp.status === 204 ? null : resp.json();
 }
 
-async function listRemote(serverUrl, apiKey) {
-  return _req(serverUrl, apiKey, "records", "GET");
-}
-async function putRecord(serverUrl, apiKey, bundle) {
-  return _req(serverUrl, apiKey, "records/" + encodeURIComponent(bundle.id), "PUT", {
-    updatedAt: bundle.updatedAt,
-    ciphertext: bundle.ciphertext,
-    iv: bundle.iv,
-  });
+async function listRemote(serverUrl, token) {
+  return _req(serverUrl, token, "records", "GET");
 }
 
-async function syncHistory(serverUrl, apiKey, localList) {
-  const key = await deriveKey(apiKey);
-  const remoteBundles = await listRemote(serverUrl, apiKey);
-  const remote = [];
-  const failed = [];
-  for (const b of remoteBundles) {
-    try { remote.push(await decryptRecord(b, key)); }
-    catch (_) { failed.push(b.id); }
-  }
+async function putRecord(serverUrl, token, record) {
+  return _req(serverUrl, token, "records/" + encodeURIComponent(record.id), "PUT", record);
+}
+
+async function syncHistory(serverUrl, token, localList) {
+  const remote = await listRemote(serverUrl, token);
   const { merged, pulled, toPush } = mergeRecords(localList, remote);
   let pushed = 0;
+  const failed = [];
   for (const rec of toPush) {
     try {
-      await putRecord(serverUrl, apiKey, await encryptRecord(sanitizeRecord(rec), key));
+      await putRecord(serverUrl, token, sanitizeRecord(rec));
       pushed++;
     } catch (e) { failed.push(rec.id); }
   }
@@ -132,7 +67,7 @@ async function syncHistory(serverUrl, apiKey, localList) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { SALT, deriveKey, encryptRecord, decryptRecord, sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
+  module.exports = { sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 } else {
-  globalThis.SyncClient = { SALT, deriveKey, encryptRecord, decryptRecord, sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
+  globalThis.SyncClient = { sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 }
