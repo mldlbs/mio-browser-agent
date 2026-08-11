@@ -13,15 +13,26 @@ const DEFAULT_SETTINGS = {
     baseURL: "https://open.bigmodel.cn/api/paas/v4",
     apiKey: "",
   },
+  sync: {
+    enabled: false,
+    serverUrl: "",
+    apiKey: "",
+    lastSyncAt: 0,
+  },
 };
 
 function normalizeVision(v) {
   return Object.assign({}, DEFAULT_SETTINGS.vision, v || {});
 }
 
+function normalizeSync(v) {
+  return Object.assign({}, DEFAULT_SETTINGS.sync, v || {});
+}
+
 function normalizeSettings(s) {
   const out = Object.assign({}, DEFAULT_SETTINGS, s || {});
   out.vision = normalizeVision(out.vision);
+  out.sync = normalizeSync(out.sync);
   return out;
 }
 
