@@ -1,14 +1,18 @@
 const crypto = require("crypto");
 
-function makeAuth(apiKey) {
-  if (!apiKey) throw new Error("SYNC_API_KEY env is required");
-  const expected = Buffer.from(apiKey);
-  return (req) => {
-    const provided = req.headers["x-api-key"];
-    if (!provided) return false;
-    const a = Buffer.from(provided);
-    return a.length === expected.length && crypto.timingSafeEqual(a, expected);
-  };
+function hashPassword(password, salt) {
+  return crypto.scryptSync(password, salt, 64).toString("hex");
 }
 
-module.exports = { makeAuth };
+function makePassword() {
+  return crypto.randomBytes(16).toString("hex");
+}
+
+function verifyPassword(password, salt, expectedHash) {
+  const actual = hashPassword(password, salt);
+  const a = Buffer.from(actual, "hex");
+  const b = Buffer.from(expectedHash, "hex");
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+module.exports = { hashPassword, makePassword, verifyPassword };
