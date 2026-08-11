@@ -46,6 +46,12 @@ async function encryptRecord(rec, keyB64) {
   };
 }
 
+function sanitizeRecord(rec) {
+  const out = Object.assign({}, rec);
+  delete out.resume;
+  return out;
+}
+
 async function decryptRecord(bundle, keyB64) {
   const k = await _rawKey(keyB64);
   const iv = unb64u(bundle.iv);
@@ -118,7 +124,7 @@ async function syncHistory(serverUrl, apiKey, localList) {
   let pushed = 0;
   for (const rec of toPush) {
     try {
-      await putRecord(serverUrl, apiKey, await encryptRecord(rec, key));
+      await putRecord(serverUrl, apiKey, await encryptRecord(sanitizeRecord(rec), key));
       pushed++;
     } catch (e) { failed.push(rec.id); }
   }
@@ -126,7 +132,7 @@ async function syncHistory(serverUrl, apiKey, localList) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
+  module.exports = { SALT, deriveKey, encryptRecord, decryptRecord, sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 } else {
-  globalThis.SyncClient = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
+  globalThis.SyncClient = { SALT, deriveKey, encryptRecord, decryptRecord, sanitizeRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 }

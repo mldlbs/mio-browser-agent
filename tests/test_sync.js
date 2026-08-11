@@ -32,6 +32,16 @@ async function run() {
   assertEq(sync.apiUrl("https://x.com", "records"), "https://x.com/v1/records", "apiUrl join");
   assertEq(sync.apiUrl("https://x.com/", "records/a1"), "https://x.com/v1/records/a1", "apiUrl strip trailing slash");
 
+  // sanitizeRecord: strips resume, keeps the rest
+  const recWithResume = { id: "r9", goal: "t", status: "done", finishedAt: 9, logs: [], resume: { goal: "t", plan: [], nextStepIndex: 1, lastSummary: "s", notes: ["secret"] } };
+  const sanitized = sync.sanitizeRecord(recWithResume);
+  assertOk(!("resume" in sanitized), "sanitizeRecord strips resume");
+  assertEq(sanitized.goal, "t", "sanitizeRecord keeps goal");
+  assertOk("resume" in recWithResume, "sanitizeRecord does not mutate input");
+  const encSan = await sync.encryptRecord(sanitized, k1);
+  const decSan = await sync.decryptRecord(encSan, k1);
+  assertOk(!("resume" in decSan), "encrypted sanitized record has no resume");
+
   // mergeRecords: local-only
   {
     const res = sync.mergeRecords([{ id: "l1", finishedAt: 100 }], []);
@@ -90,7 +100,7 @@ async function run() {
   };
   const local = [
     { id: "r1", goal: "旧", finishedAt: 1000 },
-    { id: "r2", goal: "新本地", finishedAt: 2000 },
+    { id: "r2", goal: "新本地", finishedAt: 2000, resume: { goal: "新本地", plan: [], nextStepIndex: 1, lastSummary: "s", notes: ["secret"] } },
   ];
   const res = await sync.syncHistory("https://srv", "k", local);
   assertOk(calls.some((c) => c.method === "GET"), "syncHistory lists remote");
@@ -101,6 +111,13 @@ async function run() {
   assertOk(calls.some((c) => c.method === "PUT" && c.url.endsWith("/v1/records/r2")), "PUT goes to encoded record URL");
   assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).iv), "PUT carries ciphertext bundle (iv present)");
   assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).updatedAt === 2000), "PUT carries updatedAt from local record");
+  {
+    const r2put = calls.find((c) => c.method === "PUT" && c.url.endsWith("/v1/records/r2"));
+    const bundle = JSON.parse(r2put.body);
+    const decrypted = await sync.decryptRecord(bundle, historyKey);
+    assertOk(!("resume" in decrypted), "syncHistory upload excludes resume");
+    assertEq(decrypted.goal, "新本地", "syncHistory upload keeps goal");
+  }
   delete global.fetch;
 
   console.log(pass + " passed, " + fail + " failed");

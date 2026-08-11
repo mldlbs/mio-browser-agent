@@ -210,7 +210,7 @@ async function init() {
       const st = await getSettings();
       st.sync.lastSyncAt = Date.now();
       await setSettings(st);
-      $("syncStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushFailed + " · 失败 " + res.failed.length;
+      $("syncStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushed + (res.pushFailed ? " · 上传失败 " + res.pushFailed : "") + " · 失败 " + res.failed.length;
       toast("同步完成");
     } catch (e) {
       const msg = e && e.status === 401 ? "API Key 错误" : (e && e.status === 404 ? "服务器未就绪" : "无法连接服务器");
@@ -501,6 +501,8 @@ async function startTask(resume) {
       apiKey: $("visionApiKey").value.trim(),
     },
   };
+  const prev = await getSettings();
+  settings.sync = prev.sync || {};
   await setSettings(settings);
   if (!settings.apiKey) { toast("请先保存 API Key"); $("apiKey").focus(); return; }
 
