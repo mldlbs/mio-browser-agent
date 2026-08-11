@@ -84,7 +84,7 @@ async function run() {
   const remoteBundle = await sync.encryptRecord({ id: "r1", goal: "新", finishedAt: 5000 }, historyKey);
   const calls = [];
   global.fetch = async (url, opts) => {
-    calls.push({ url, method: opts && opts.method || "GET", key: opts && opts.headers && opts.headers["X-Api-Key"] });
+    calls.push({ url, method: opts && opts.method || "GET", key: opts && opts.headers && opts.headers["X-Api-Key"], body: opts && opts.body });
     if (opts && opts.method === "PUT") return { ok: true, status: 200, json: async () => ({ ok: true }) };
     return { ok: true, status: 200, json: async () => [remoteBundle] };
   };
@@ -98,6 +98,9 @@ async function run() {
   assertOk(puts.length >= 1, "syncHistory pushes missing local");
   assertOk(puts.every((c) => c.key === "k"), "PUT carries api key");
   assertOk(res.pulled >= 1, "pull reported");
+  assertOk(calls.some((c) => c.method === "PUT" && c.url.endsWith("/v1/records/r2")), "PUT goes to encoded record URL");
+  assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).iv), "PUT carries ciphertext bundle (iv present)");
+  assertOk(calls.some((c) => c.method === "PUT" && c.body && JSON.parse(c.body).updatedAt === 2000), "PUT carries updatedAt from local record");
   delete global.fetch;
 
   console.log(pass + " passed, " + fail + " failed");

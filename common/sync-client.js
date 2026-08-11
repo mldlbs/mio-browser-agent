@@ -122,7 +122,7 @@ async function syncHistory(serverUrl, apiKey, localList) {
       pushed++;
     } catch (e) { failed.push(rec.id); }
   }
-  return { merged, pulled: pulled.length, pushed, skipped: toPush.length - pushed, failed };
+  return { merged, pulled: pulled.length, pushed, pushFailed: toPush.length - pushed, failed };
 }
 
 if (typeof module !== "undefined") {
