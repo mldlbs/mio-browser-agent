@@ -77,8 +77,56 @@ function mergeRecords(localList, remoteList) {
   return { merged, pulled, toPush };
 }
 
+async function _req(serverUrl, apiKey, path, method, body) {
+  const url = apiUrl(serverUrl, path);
+  const headers = { "X-Api-Key": apiKey };
+  if (body) headers["Content-Type"] = "application/json";
+  const resp = await fetch(url, {
+    method: method || "GET",
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!resp.ok) {
+    const err = new Error("HTTP " + resp.status);
+    err.status = resp.status;
+    throw err;
+  }
+  return resp.status === 204 ? null : resp.json();
+}
+
+async function listRemote(serverUrl, apiKey) {
+  return _req(serverUrl, apiKey, "records", "GET");
+}
+async function putRecord(serverUrl, apiKey, bundle) {
+  return _req(serverUrl, apiKey, "records/" + encodeURIComponent(bundle.id), "PUT", {
+    updatedAt: bundle.updatedAt,
+    ciphertext: bundle.ciphertext,
+    iv: bundle.iv,
+  });
+}
+
+async function syncHistory(serverUrl, apiKey, localList) {
+  const key = await deriveKey(apiKey);
+  const remoteBundles = await listRemote(serverUrl, apiKey);
+  const remote = [];
+  const failed = [];
+  for (const b of remoteBundles) {
+    try { remote.push(await decryptRecord(b, key)); }
+    catch (_) { failed.push(b.id); }
+  }
+  const { merged, pulled, toPush } = mergeRecords(localList, remote);
+  let pushed = 0;
+  for (const rec of toPush) {
+    try {
+      await putRecord(serverUrl, apiKey, await encryptRecord(rec, key));
+      pushed++;
+    } catch (e) { failed.push(rec.id); }
+  }
+  return { merged, pulled: pulled.length, pushed, skipped: toPush.length - pushed, failed };
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords };
+  module.exports = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 } else {
-  globalThis.SyncClient = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords };
+  globalThis.SyncClient = { SALT, deriveKey, encryptRecord, decryptRecord, apiUrl, mergeRecords, _req, listRemote, putRecord, syncHistory };
 }

@@ -79,6 +79,27 @@ async function run() {
     assertOk(threw, "tampered ciphertext fails decrypt");
   }
 
+  // syncHistory 编排（mock fetch）
+  const historyKey = await sync.deriveKey("k");
+  const remoteBundle = await sync.encryptRecord({ id: "r1", goal: "新", finishedAt: 5000 }, historyKey);
+  const calls = [];
+  global.fetch = async (url, opts) => {
+    calls.push({ url, method: opts && opts.method || "GET", key: opts && opts.headers && opts.headers["X-Api-Key"] });
+    if (opts && opts.method === "PUT") return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    return { ok: true, status: 200, json: async () => [remoteBundle] };
+  };
+  const local = [
+    { id: "r1", goal: "旧", finishedAt: 1000 },
+    { id: "r2", goal: "新本地", finishedAt: 2000 },
+  ];
+  const res = await sync.syncHistory("https://srv", "k", local);
+  assertOk(calls.some((c) => c.method === "GET"), "syncHistory lists remote");
+  const puts = calls.filter((c) => c.method === "PUT");
+  assertOk(puts.length >= 1, "syncHistory pushes missing local");
+  assertOk(puts.every((c) => c.key === "k"), "PUT carries api key");
+  assertOk(res.pulled >= 1, "pull reported");
+  delete global.fetch;
+
   console.log(pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
 }
