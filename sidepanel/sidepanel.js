@@ -6,6 +6,7 @@ let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
 let _historyPage = 0;
 let expandedFailureStep = null;
+const SYNC_SERVER = "https://mio-sync.example.com";
 
 function resetPlanProgress() {
   planProgress = { steps: [], done: [], failed: [], replanned: false };
@@ -176,7 +177,7 @@ async function renderAuthState() {
   } else {
     btn.textContent = "登录";
     btn.classList.remove("logged-in");
-    popupBody.innerHTML = '<input id="authEmail" type="email" placeholder="邮箱"><input id="authPassword" type="password" placeholder="密码"><input id="authServer" type="url" placeholder="https://your-server"><div class="auth-popup-actions"><button id="authRegister">注册</button><button id="authLogin">登录</button></div><div class="auth-popup-status" id="authPopupStatus"></div>';
+    popupBody.innerHTML = '<input id="authEmail" type="email" placeholder="邮箱"><input id="authPassword" type="password" placeholder="密码"><div class="auth-popup-actions"><button id="authRegister">注册</button><button id="authLogin">登录</button></div><div class="auth-popup-status" id="authPopupStatus"></div>';
     wireAuthPopupListeners();
   }
 }
