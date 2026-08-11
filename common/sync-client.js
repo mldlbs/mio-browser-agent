@@ -2,10 +2,17 @@ const SALT = "mio-sync-v1";
 const PBKDF2_ITERATIONS = 100000;
 
 function b64u(buf) {
-  return Buffer.from(buf).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  let bin = "";
+  const bytes = new Uint8Array(buf);
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function unb64u(s) {
-  return new Uint8Array(Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64"));
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/") + "====".slice(0, (4 - (s.length % 4)) % 4);
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 async function deriveKey(apiKey) {
