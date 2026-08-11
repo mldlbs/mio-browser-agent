@@ -144,6 +144,16 @@ function renderTemplates() {
   }
 }
 
+async function renderAuthState() {
+  const loggedIn = await AuthClient.isLoggedIn();
+  $("syncLoggedOut").style.display = loggedIn ? "none" : "";
+  $("syncLoggedIn").style.display = loggedIn ? "" : "none";
+  if (loggedIn) {
+    const session = await AuthClient.getSession();
+    $("authEmailDisplay").textContent = session ? session.email : "";
+  }
+}
+
 async function init() {
   const verEl = $("version");
   if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
@@ -164,8 +174,9 @@ async function init() {
   const sync = s.sync || {};
   $("syncEnabled").checked = !!sync.enabled;
   $("syncServer").value = sync.serverUrl || "";
-  $("syncApiKey").value = sync.apiKey || "";
   if (sync.lastSyncAt) $("syncStatus").textContent = "上次同步: " + new Date(sync.lastSyncAt).toLocaleString();
+
+  await renderAuthState();
 
   $("saveSettings").addEventListener("click", async () => {
     await setSettings({
@@ -184,28 +195,54 @@ async function init() {
       sync: {
         enabled: !!$("syncEnabled").checked,
         serverUrl: $("syncServer").value.trim(),
-        apiKey: $("syncApiKey").value.trim(),
         lastSyncAt: (await getSettings()).sync && (await getSettings()).sync.lastSyncAt || 0,
       },
     });
     toast("设置已保存");
   });
 
-  $("syncTest").addEventListener("click", async () => {
-    const url = $("syncServer").value.trim();
-    if (!url) return toast("请先填同步服务器地址");
+  $("authRegister").addEventListener("click", async () => {
+    const email = $("authEmail").value.trim();
+    const password = $("authPassword").value;
+    const serverUrl = $("syncServer").value.trim();
+    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
     try {
-      const r = await fetch(url.replace(/\/+$/, "") + "/v1/health");
-      toast(r.ok ? "连接成功" : "连接失败 (HTTP " + r.status + ")");
-    } catch (_) { toast("无法连接服务器"); }
+      await AuthClient.register(email, password, serverUrl);
+      await renderAuthState();
+      toast("注册成功");
+    } catch (e) {
+      toast("注册失败: " + (e && e.status === 409 ? "邮箱已注册" : "无法连接服务器"));
+    }
   });
+
+  $("authLogin").addEventListener("click", async () => {
+    const email = $("authEmail").value.trim();
+    const password = $("authPassword").value;
+    const serverUrl = $("syncServer").value.trim();
+    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
+    try {
+      await AuthClient.login(email, password, serverUrl);
+      await renderAuthState();
+      toast("登录成功");
+    } catch (e) {
+      toast("登录失败: " + (e && e.status === 401 ? "邮箱或密码错误" : "无法连接服务器"));
+    }
+  });
+
+  $("authLogout").addEventListener("click", async () => {
+    const serverUrl = $("syncServer").value.trim();
+    await AuthClient.logout(serverUrl);
+    await renderAuthState();
+    toast("已登出");
+  });
+
   $("syncNow").addEventListener("click", async () => {
-    const url = $("syncServer").value.trim();
-    const key = $("syncApiKey").value.trim();
-    if (!url || !key) return toast("请先填服务器地址和 API Key");
+    const serverUrl = $("syncServer").value.trim();
+    const session = await AuthClient.getSession();
+    if (!serverUrl || !session) return toast("请先登录并填服务器地址");
     try {
       const hist = await HistoryModule.getHistory();
-      const res = await SyncClient.syncHistory(url, key, hist);
+      const res = await SyncClient.syncHistory(serverUrl, session.token, hist);
       if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
       const st = await getSettings();
       st.sync.lastSyncAt = Date.now();
@@ -213,7 +250,7 @@ async function init() {
       $("syncStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushed + (res.pushFailed ? " · 上传失败 " + res.pushFailed : "") + " · 失败 " + res.failed.length;
       toast("同步完成");
     } catch (e) {
-      const msg = e && e.status === 401 ? "API Key 错误" : (e && e.status === 404 ? "服务器未就绪" : "无法连接服务器");
+      const msg = e && e.status === 401 ? "登录已过期，请重新登录" : (e && e.status === 404 ? "服务器未就绪" : "无法连接服务器");
       toast("同步失败: " + msg);
     }
   });
@@ -321,13 +358,16 @@ async function historyLog(goal) {
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
   await HistoryModule.addHistoryRecord(currentTask);
   const st = await getSettings();
-  if (st.sync && st.sync.enabled && st.sync.serverUrl && st.sync.apiKey) {
-    try {
-      const res = await SyncClient.syncHistory(st.sync.serverUrl, st.sync.apiKey, await HistoryModule.getHistory());
-      if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
-      st.sync.lastSyncAt = Date.now();
-      await setSettings(st);
-    } catch (_) { /* 静默，不打断任务完成 */ }
+  if (st.sync && st.sync.enabled && st.sync.serverUrl) {
+    const session = await AuthClient.getSession();
+    if (session) {
+      try {
+        const res = await SyncClient.syncHistory(st.sync.serverUrl, session.token, await HistoryModule.getHistory());
+        if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
+        st.sync.lastSyncAt = Date.now();
+        await setSettings(st);
+      } catch (_) { /* 静默，不打断任务完成 */ }
+    }
   }
   currentTask = null;
 }

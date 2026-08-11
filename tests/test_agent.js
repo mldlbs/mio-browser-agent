@@ -446,10 +446,10 @@ function assertEq(got, want, name) {
   const svEmpty = storage.normalizeSettings({}).vision;
   assertEq(svEmpty.model, "", "normalizeSettings vision model default empty (falls back to main)");
   assertEq(svEmpty.provider, "openai", "normalizeSettings vision provider default");
-  const ss = storage.normalizeSettings({ sync: { enabled: true, serverUrl: "https://s", apiKey: "k" } }).sync;
-  assertEq(ss.enabled, true, "normalizeSettings keeps sync.enabled");
-  assertEq(ss.serverUrl, "https://s", "normalizeSettings keeps sync.serverUrl");
-  assertEq(ss.lastSyncAt, 0, "normalizeSettings sync.lastSyncAt default 0");
+   const ss = storage.normalizeSettings({ sync: { enabled: true, serverUrl: "https://s" } }).sync;
+   assertEq(ss.enabled, true, "normalizeSettings keeps sync.enabled");
+   assertEq(ss.serverUrl, "https://s", "normalizeSettings keeps sync.serverUrl");
+   assertEq(ss.lastSyncAt, 0, "normalizeSettings sync.lastSyncAt default 0");
   const ssDef = storage.normalizeSettings({}).sync;
   assertEq(ssDef.enabled, false, "normalizeSettings sync default disabled");
 

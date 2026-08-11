@@ -16,7 +16,6 @@ const DEFAULT_SETTINGS = {
   sync: {
     enabled: false,
     serverUrl: "",
-    apiKey: "",
     lastSyncAt: 0,
   },
 };
