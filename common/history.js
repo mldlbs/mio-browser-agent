@@ -42,6 +42,10 @@ async function updateHistoryRecord(id, patch) {
   return list;
 }
 
+async function _setRawHistory(list) {
+  await chrome.storage.local.set({ [HISTORY_KEY]: list.slice(0, MAX_RECORDS) });
+}
+
 function sortRecords(records) {
   return records.slice().sort((a, b) => (!!b.pinned - !!a.pinned) || (b.startedAt - a.startedAt));
 }
@@ -103,7 +107,7 @@ async function importRecords(raw) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord };
+  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, _setRawHistory, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord };
 } else {
   globalThis.HistoryModule = {
     HISTORY_KEY,
@@ -112,6 +116,7 @@ if (typeof module !== "undefined") {
     getHistory,
     addHistoryRecord,
     updateHistoryRecord,
+    _setRawHistory,
     sortRecords,
     filterRecords,
     clearHistory,

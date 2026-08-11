@@ -320,6 +320,15 @@ async function historyLog(goal) {
   if (!currentTask) return;
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
   await HistoryModule.addHistoryRecord(currentTask);
+  const st = await getSettings();
+  if (st.sync && st.sync.enabled && st.sync.serverUrl && st.sync.apiKey) {
+    try {
+      const res = await SyncClient.syncHistory(st.sync.serverUrl, st.sync.apiKey, await HistoryModule.getHistory());
+      if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
+      st.sync.lastSyncAt = Date.now();
+      await setSettings(st);
+    } catch (_) { /* 静默，不打断任务完成 */ }
+  }
   currentTask = null;
 }
 
