@@ -161,6 +161,11 @@ async function init() {
   $("visionModel").value = v.model || "";
   $("visionBaseUrl").value = v.baseURL || "https://open.bigmodel.cn/api/paas/v4";
   $("visionApiKey").value = v.apiKey || "";
+  const sync = s.sync || {};
+  $("syncEnabled").checked = !!sync.enabled;
+  $("syncServer").value = sync.serverUrl || "";
+  $("syncApiKey").value = sync.apiKey || "";
+  if (sync.lastSyncAt) $("syncStatus").textContent = "上次同步: " + new Date(sync.lastSyncAt).toLocaleString();
 
   $("saveSettings").addEventListener("click", async () => {
     await setSettings({
@@ -176,8 +181,41 @@ async function init() {
         baseURL: $("visionBaseUrl").value.trim() || "https://open.bigmodel.cn/api/paas/v4",
         apiKey: $("visionApiKey").value.trim(),
       },
+      sync: {
+        enabled: !!$("syncEnabled").checked,
+        serverUrl: $("syncServer").value.trim(),
+        apiKey: $("syncApiKey").value.trim(),
+        lastSyncAt: (await getSettings()).sync && (await getSettings()).sync.lastSyncAt || 0,
+      },
     });
     toast("设置已保存");
+  });
+
+  $("syncTest").addEventListener("click", async () => {
+    const url = $("syncServer").value.trim();
+    if (!url) return toast("请先填同步服务器地址");
+    try {
+      const r = await fetch(url.replace(/\/+$/, "") + "/v1/health");
+      toast(r.ok ? "连接成功" : "连接失败 (HTTP " + r.status + ")");
+    } catch (_) { toast("无法连接服务器"); }
+  });
+  $("syncNow").addEventListener("click", async () => {
+    const url = $("syncServer").value.trim();
+    const key = $("syncApiKey").value.trim();
+    if (!url || !key) return toast("请先填服务器地址和 API Key");
+    try {
+      const hist = await HistoryModule.getHistory();
+      const res = await SyncClient.syncHistory(url, key, hist);
+      if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
+      const st = await getSettings();
+      st.sync.lastSyncAt = Date.now();
+      await setSettings(st);
+      $("syncStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushFailed + " · 失败 " + res.failed.length;
+      toast("同步完成");
+    } catch (e) {
+      const msg = e && e.status === 401 ? "API Key 错误" : (e && e.status === 404 ? "服务器未就绪" : "无法连接服务器");
+      toast("同步失败: " + msg);
+    }
   });
 
   $("start").addEventListener("click", startTask);
