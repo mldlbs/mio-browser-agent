@@ -114,6 +114,71 @@
     .status-pill.running .dot { background: var(--teal); animation: pulse 1.4s infinite; }
     .status-pill.done .dot { background: var(--green); }
     .status-pill.error .dot { background: var(--red); }
+
+    .header-auth { position: relative; }
+    .auth-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      color: var(--subtext);
+      cursor: pointer;
+      transition: all .2s;
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .auth-btn:hover { border-color: var(--mauve); color: var(--text); }
+    .auth-btn.logged-in { color: var(--teal); border-color: rgba(148,226,213,.4); }
+    .auth-popup {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 100;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: 10px;
+      padding: 10px;
+      min-width: 200px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    }
+    .auth-popup-body { display: flex; flex-direction: column; gap: 6px; }
+    .auth-popup-body input {
+      background: var(--base);
+      border: 1px solid var(--surface);
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+    .auth-popup-body input:focus { border-color: var(--mauve); }
+    .auth-popup-actions { display: flex; gap: 6px; }
+    .auth-popup-actions button {
+      flex: 1;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid transparent;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .auth-popup-actions button:hover { border-color: var(--mauve); }
+    .auth-popup-actions #authLogin { background: var(--mauve); color: var(--base); font-weight: 600; }
+    .auth-popup-status { font-size: 10px; color: var(--overlay); min-height: 12px; }
+    .auth-popup-logout { text-align: center; }
+    .auth-popup-logout button {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      background: rgba(243,139,168,.15);
+      border: 1px solid rgba(243,139,168,.3);
+      color: var(--red);
+      cursor: pointer;
+    }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 
     #collapsePanel {
@@ -589,6 +654,21 @@
       <span class="dot"></span>
       <span id="status">idle</span>
     </div>
+    <div class="header-auth">
+      <button id="authBtn" class="auth-btn" title="云同步账户">登录</button>
+      <div class="auth-popup" id="authPopup" hidden>
+        <div class="auth-popup-body">
+          <input id="authEmail" type="email" placeholder="邮箱">
+          <input id="authPassword" type="password" placeholder="密码">
+          <input id="authServer" type="url" placeholder="https://your-server">
+          <div class="auth-popup-actions">
+            <button id="authRegister">注册</button>
+            <button id="authLogin">登录</button>
+          </div>
+          <div class="auth-popup-status" id="authPopupStatus"></div>
+        </div>
+      </div>
+    </div>
     <button id="collapsePanel" title="收起整个侧边栏（点击工具栏图标可重新打开）">收起</button>
   </header>
 
@@ -617,8 +697,6 @@
         <div><label>Vision Base URL</label><input id="visionBaseUrl" placeholder="https://open.bigmodel.cn/api/paas/v4"></div>
         <div class="full"><label>Vision API Key</label><input id="visionApiKey" type="password"></div>
          <div class="full vis-head">云同步（执行历史跨设备备份，端到端加密）</div>
-         <div><label><input id="syncEnabled" type="checkbox" style="width:auto; vertical-align:middle"> 启用云同步</label></div>
-         <div class="full"><label>同步服务器</label><input id="syncServer" placeholder="https://your-server.example.com"></div>
          <div id="syncLoggedOut" class="full" style="display:none">
            <div style="margin-bottom:6px"><label>邮箱</label><input id="authEmail" type="email" placeholder="you@example.com"></div>
            <div style="margin-bottom:6px"><label>密码</label><input id="authPassword" type="password" placeholder="密码"></div>
@@ -631,7 +709,6 @@
            <div style="margin-bottom:6px; font-size:12px; color:var(--subtext)">账号: <span id="authEmailDisplay"></span></div>
            <div style="display:flex; gap:8px">
              <button id="authLogout">登出</button>
-             <button id="syncNow">立即同步</button>
            </div>
          </div>
          <div class="full" id="syncStatus" style="font-size:12px; color:var(--subtext)"></div>

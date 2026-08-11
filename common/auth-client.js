@@ -16,7 +16,7 @@ async function register(email, password, serverUrl) {
     throw err;
   }
   const data = await resp.json();
-  const session = { token: data.token, email: data.email };
+  const session = { token: data.token, email: data.email, serverUrl };
   await chrome.storage.local.set({ [SESSION_KEY]: session });
   return session;
 }
@@ -33,7 +33,7 @@ async function login(email, password, serverUrl) {
     throw err;
   }
   const data = await resp.json();
-  const session = { token: data.token, email: data.email };
+  const session = { token: data.token, email: data.email, serverUrl };
   await chrome.storage.local.set({ [SESSION_KEY]: session });
   return session;
 }
