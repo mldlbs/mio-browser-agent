@@ -40,7 +40,7 @@
 ## 🏗️ 架构
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/mldlbs/mio-browser-agent/main/diagrams/mio-arch.svg" alt="mio 架构图" width="100%" />
+  <img src="diagrams/mio-arch.svg" alt="mio 架构图" width="100%" />
 </p>
 
 数据流：`planner.js` 规划 → `agent-runtime.js` 调度 `executor.js` 逐步骤执行 → `bridge.js` 通知 `content/main.js` 在页面内动作 → 快照回传 → `turn-handler.js` 组装新一轮 LLM 请求 → 直至任务完成或恢复引擎接管。
