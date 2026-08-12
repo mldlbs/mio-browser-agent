@@ -529,8 +529,11 @@ function assertEq(got, want, name) {
   assertEq(shareRec.logs.length, 1, "share record keeps logs");
   assert(shareRec.resume === undefined, "share record strips resume (no checkpoint leak)");
   assert(shareRec.notes === undefined, "share record strips notes (no credential leak)");
+  assertEq(shareRec.id, "share1", "share record keeps id so it can be re-imported");
   const shareMany = historyMod.buildShareRecord({ id: "x", goal: "g", logs: Array.from({ length: 400 }, (_, i) => ({ tag: "step", text: "l" + i })) });
   assertEq(shareMany.logs.length, 300, "share record caps logs at 300");
+  const reimport = await historyMod.importRecords([shareRec]);
+  assert(!!reimport.find((r) => r.id === "share1"), "share record round-trips through importRecords");
 
   // ── templates ──
   assert(templatesMod.TEMPLATES.length >= 4, "templates module ships common tasks");
@@ -541,6 +544,8 @@ function assertEq(got, want, name) {
   assert(filled.includes("memo"), "cross-site template mentions memo");
   const noFill = templatesMod.applyTemplate(tCross, {});
   assert(noFill.includes("{source}"), "applyTemplate leaves unknown placeholders intact");
+  assertEq(JSON.stringify(templatesMod.extractPlaceholders(tCross.goal)), JSON.stringify(["source", "item", "target"]), "extractPlaceholders lists unique placeholder keys");
+  assertEq(JSON.stringify(templatesMod.extractPlaceholders("无占位符")), JSON.stringify([]), "extractPlaceholders empty for plain text");
 
   await historyMod.clearHistory();
   delete global.chrome;
@@ -1385,6 +1390,29 @@ function assertEq(got, want, name) {
   assert(recRes.summary === "done", "retry_snapshot recovery reaches finish on the follow-up turn");
   assert(recEvents.some((e) => e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "recovery emits error event with code");
   assert(recEvents.some((e) => e.kind === "attempt" && e.action === "retry_snapshot"), "recovery emits retry_snapshot attempt event");
+
+  // ── onStepEvent: step events streamed in real time during execution ──
+  const streamLlm = mockLlm([
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // element missing → ELEMENT_NOT_FOUND
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "done" })] }),
+  ]);
+  const streamEvents = [];
+  const streamRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "点按钮" }] },
+    {
+      llm: streamLlm, bridge: execBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: () => {}, onStepEvent: (ev) => streamEvents.push(ev),
+      replan: async () => { throw new Error("no replan"); },
+      maxTurns: 4, maxStepRetries: 3, maxRecoveryAttempts: 2, isStopped: () => false,
+    }
+  );
+  assert(streamRes.ok, "onStepEvent run completes");
+  assert(streamEvents.some((e) => e.type === "step_start" && e.stepIndex === 0), "onStepEvent streams step_start live");
+  assert(streamEvents.some((e) => e.type === "recovery" && e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "onStepEvent streams recovery error live");
+  assert(streamEvents.some((e) => e.type === "recovery" && e.kind === "attempt" && e.action === "retry_snapshot"), "onStepEvent streams recovery attempt live");
+  assert(streamEvents.some((e) => e.type === "step_done" && e.stepIndex === 0), "onStepEvent streams step_done live");
+  assertEq(JSON.stringify(streamRes.events), JSON.stringify(streamEvents), "returned events equal the live stream");
 
   // ── recovery-events: structured stream + renderer ──
   const revMod = require("../sidepanel/recovery-events.js");
