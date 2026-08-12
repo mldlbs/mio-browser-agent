@@ -150,10 +150,10 @@ function applyTemplateWithPrompt(t) {
 
 // Render the one-click task templates above the goal box. Clicking a template
 // prompts for its {placeholders} and fills the completed goal.
-function renderTemplates() {
+async function renderTemplates() {
   const host = $("composeTemplates");
   if (!host) return;
-  const tmpls = (globalThis.TemplatesModule && TemplatesModule.getTemplates()) || [];
+  const tmpls = (globalThis.TemplatesModule && await TemplatesModule.getTemplates()) || [];
   host.innerHTML = "";
   for (const t of tmpls) {
     const chip = document.createElement("button");
@@ -238,9 +238,8 @@ async function init() {
   if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
     verEl.textContent = "v" + (chrome.runtime.getManifest().version || "");
   }
-  renderTemplates();
-  const s = await getSettings();
-  $("provider").value = s.provider;
+  await renderTemplates();
+  const s = await getSettings();  $("provider").value = s.provider;
   $("model").value = s.model;
   $("baseUrl").value = s.baseURL;
   $("apiKey").value = s.apiKey;
@@ -409,7 +408,7 @@ async function saveTaskAsTemplate(r) {
   try {
     const added = await TemplatesModule.addCustomTemplate({ label: label.trim() || "我的模板", goal: r.goal });
     if (added) {
-      renderTemplates();
+      await renderTemplates();
       toast("已保存为模板");
     } else {
       toast("该模板已存在");
