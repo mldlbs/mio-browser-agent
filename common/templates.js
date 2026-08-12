@@ -48,8 +48,44 @@ function findTemplateById(id) {
   return TEMPLATES.find((t) => t.id === id) || null;
 }
 
+// Extract unique {placeholder} keys from a goal text (order preserved).
+function extractPlaceholders(goal) {
+  return [...new Set((goal.match(/\{(\w+)\}/g) || []).map((s) => s.slice(1, -1)))];
+}
+
+// Custom templates persisted per-user (storage.local). Built-in templates are
+// always shown first; custom ones (added from history "存为模板") follow.
+const CUSTOM_KEY = "mioCustomTemplates";
+
+async function getCustomTemplates() {
+  if (!globalThis.chrome || !chrome.storage) return [];
+  const raw = await chrome.storage.local.get(CUSTOM_KEY);
+  const list = raw && raw[CUSTOM_KEY];
+  return Array.isArray(list) ? list : [];
+}
+
+async function getTemplates() {
+  const custom = await getCustomTemplates();
+  return TEMPLATES.concat(custom.map((t) => Object.assign({}, t, { custom: true })));
+}
+
+async function addCustomTemplate(tpl) {
+  const list = await getCustomTemplates();
+  const goal = (tpl && tpl.goal) || "";
+  if (list.some((t) => t.goal === goal)) return null;
+  const custom = {
+    id: "custom-" + Date.now().toString(36),
+    label: (tpl && tpl.label) || "自定义模板",
+    goal,
+    hint: (tpl && tpl.hint) || "自定义模板",
+  };
+  const next = list.concat(custom).slice(-50);
+  await chrome.storage.local.set({ [CUSTOM_KEY]: next });
+  return custom;
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { TEMPLATES, applyTemplate, findTemplateById };
+  module.exports = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate };
 } else {
-  globalThis.TemplatesModule = { TEMPLATES, applyTemplate, findTemplateById };
+  globalThis.TemplatesModule = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate };
 }

@@ -98,6 +98,14 @@ async function executeStep(step, ctx) {
     isStopped, maxTurns, maxRecoveryAttempts = 2 
   } = ctx;
   
+  // Standalone executeStep callers (unit tests) may lack pushStepEvent; fall
+  // back to a plain stepEvents append so step events still accumulate.
+  if (!ctx.pushStepEvent) {
+    ctx.pushStepEvent = (ev) => {
+      if (ctx.stepEvents) ctx.stepEvents.push(ev);
+    };
+  }
+  
   // Turn handlers
   const actHandler = new _ActTurnHandler();
   const recoveryHandler = new _RecoveryTurnHandler();
@@ -376,9 +384,7 @@ async function executeStep(step, ctx) {
           ctx.history.push({ role: "tool", tool_call_id: toolCalls[j].id, content: JSON.stringify({ ok: false, error: "skipped after failure" }) });
         }
         
-        if (ctx.stepEvents) {
-          ctx.stepEvents.push({ type: "tool_failed", stepIndex: ctx.currentStepId, name: tc.name, error: result.error || "", errorCode: result.errorCode || "" });
-        }
+        ctx.pushStepEvent({ type: "tool_failed", stepIndex: ctx.currentStepId, name: tc.name, error: result.error || "", errorCode: result.errorCode || "" });
         
         const errorInfo = { 
           code: result.errorCode || "ELEMENT_NOT_FOUND", 
@@ -419,7 +425,7 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
 
   const emit = (ev) => {
     if (ctx.onRecovery) ctx.onRecovery(ev);
-    if (ctx.stepEvents) ctx.stepEvents.push(Object.assign({ type: "recovery", stepIndex: ctx.currentStepId }, ev));
+    ctx.pushStepEvent(Object.assign({ type: "recovery", stepIndex: ctx.currentStepId }, ev));
   };
   emit({ kind: "error", stepId: ctx.currentStepId, code: errorCode, message: errorDetails?.message || errorCode });
 
@@ -745,6 +751,11 @@ async function execute(plan, ctx) {
   const runCtx = Object.assign({}, ctx, { history, plan, goal: plan.goal });
   const stepEvents = [];
   runCtx.stepEvents = stepEvents;
+  const pushStepEvent = (ev) => {
+    stepEvents.push(ev);
+    if (runCtx.onStepEvent) runCtx.onStepEvent(ev);
+  };
+  runCtx.pushStepEvent = pushStepEvent;
   let current = ctx.startStep || 0;
   let attemptsForStep = 0;
   let replans = 0;
@@ -784,7 +795,7 @@ async function execute(plan, ctx) {
     }
     
     const step = plan.steps[current];
-    stepEvents.push({ type: "step_start", stepIndex: current, description: step.description });
+    pushStepEvent({ type: "step_start", stepIndex: current, description: step.description });
     runCtx.currentStepId = step.id || current;
     runCtx.currentStep = step;
     
@@ -801,14 +812,14 @@ async function execute(plan, ctx) {
       if (result.summary) lastSummary = result.summary;
       runCtx.completedSteps.push({ description: step.description, summary: result.summary || "" });
       ctx.onLog("step", "DONE: " + (result.summary || "完成"));
-      stepEvents.push({ type: "step_done", stepIndex: doneIndex, summary: result.summary || "" });
+      pushStepEvent({ type: "step_done", stepIndex: doneIndex, summary: result.summary || "" });
       emitProgress("done", { summary: result.summary || "", currentIndex: doneIndex });
       emitCheckpoint();
       continue;
     }
     
     emitProgress("failed", { error: result.error || "" });
-    stepEvents.push({ type: "step_failed", stepIndex: current, error: result.error || "", errorCode: result.errorCode || "" });
+    pushStepEvent({ type: "step_failed", stepIndex: current, error: result.error || "", errorCode: result.errorCode || "" });
     attemptsForStep++;
     if (attemptsForStep >= (ctx.maxStepRetries || 3)) {
       replans++;
@@ -829,7 +840,7 @@ async function execute(plan, ctx) {
         notes: runCtx.notes.size ? runCtx.notes.toJSON() : null,
       });
       ctx.onLog("plan", "新计划: " + newPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
-      stepEvents.push({ type: "replan", stepIndex: current, description: step.description, failedError: result.errorCode || "", failedReason: (result.error || "").slice(0, 300) });
+      pushStepEvent({ type: "replan", stepIndex: current, description: step.description, failedError: result.errorCode || "", failedReason: (result.error || "").slice(0, 300) });
       plan.steps = plan.steps.slice(0, current).concat(newPlan.steps);
       runCtx.plan = plan;
       attemptsForStep = 0;

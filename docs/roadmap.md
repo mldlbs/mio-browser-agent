@@ -99,6 +99,12 @@ BrowserContext
 
 **v0.1.19+ 补充**：导入 JSON（合并去重，id 去重 + 50 条上限）；单条任务分享（`buildShareRecord`——剥离 resume/notes 防凭据泄漏，日志封顶 300 条，导出为独立 JSON）；手动回归清单（`docs/manual-regression-checklist.md`）与实机回归场景集（`docs/test-prompts.md`）。
 
+**v0.1.45 补充——分享闭环与模板市场增强**：
+- 修复 `buildShareRecord` 缺 `id` 的断裂——分享 JSON 现在可被「导入」重新合并（`importRecords` 按 id 去重）
+- 历史记录新增「复制」（`navigator.clipboard` 复制分享 JSON，零新权限）与「存模板」（把任务目标保存为可复用模板）按钮
+- 模板点击改为交互式填占位符：`extractPlaceholders` 提取 `{site}` 等占位符 → `prompt` 逐个询问 → `applyTemplate` 生成完成目标（此前 `applyTemplate` 只在测试里被调用）
+- 自定义模板持久化到 `chrome.storage.local`（`mioCustomTemplates`，上限 50），渲染时内置模板在前、自定义在后（带 `custom` 样式区分）
+
 ### Provider 抽象 ✅
 
 保持 Adapter 即可，**不为了支持更多 Provider 再抽一层**。
@@ -114,6 +120,8 @@ BrowserContext
 有价值但收益有限。比起「Step 3」，用户更关心「Agent 为什么卡住」。排后。
 
 **已实现**：侧边栏执行计划面板——步骤列表实时渲染，当前步 ▶ 高亮脉冲、完成 ✓ 绿、失败 ✗ 红；重规划时面板标记「已重规划」并重置。
+
+**v0.1.45 补充——失败步骤恢复记录实时展开**：`executor` 新增 `onStepEvent` 实时回调（step_start/step_done/step_failed/tool_failed/recovery/replan 六类事件在执行过程中即时流出），`agent-runtime` 透传、sidepanel 实时推入 `currentTask.stepEvents` 并对已失败的展开步骤逐条重绘。任务运行中点击失败步骤即可看到实时恢复叙事（错误码 → ✓/✗ 恢复动作 → 结果），不再等任务结束；重规划时自动清除失效的展开态。
 
 ---
 

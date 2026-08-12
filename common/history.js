@@ -72,6 +72,7 @@ function buildShareRecord(r) {
   return {
     app: "mio",
     version: 1,
+    id: rec.id,
     goal: rec.goal,
     status: rec.status,
     summary: rec.summary,

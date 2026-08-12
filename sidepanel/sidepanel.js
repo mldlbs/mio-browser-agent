@@ -122,25 +122,46 @@ function toast(msg) {
   appendLog("ui", msg);
 }
 
+// Fill a template's {placeholders} interactively, then put the completed goal
+// into the compose box. Falls back to raw goal text when there are no
+// placeholders or the user cancels.
+function applyTemplateWithPrompt(t) {
+  const box = $("goal");
+  const placeholders = TemplatesModule.extractPlaceholders(t.goal);
+  if (!placeholders.length) {
+    box.value = t.goal;
+    box.focus();
+    box.setSelectionRange(0, 0);
+    return;
+  }
+  const values = {};
+  let ok = true;
+  for (const key of placeholders) {
+    const val = prompt(`填写「${t.label}」的 ${key}:`, "");
+    if (val === null) { ok = false; break; }
+    values[key] = val;
+  }
+  if (!ok) return;
+  box.value = TemplatesModule.applyTemplate(t, values);
+  box.focus();
+  box.setSelectionRange(0, 0);
+  toast("模板已填充，可继续修改");
+}
+
 // Render the one-click task templates above the goal box. Clicking a template
-// fills the goal textarea with its (placeholder) text.
+// prompts for its {placeholders} and fills the completed goal.
 function renderTemplates() {
   const host = $("composeTemplates");
   if (!host) return;
-  const tmpls = (globalThis.TemplatesModule && TemplatesModule.TEMPLATES) || [];
+  const tmpls = (globalThis.TemplatesModule && TemplatesModule.getTemplates()) || [];
   host.innerHTML = "";
   for (const t of tmpls) {
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "template-chip";
+    chip.className = "template-chip" + (t.custom ? " custom" : "");
     chip.textContent = t.label;
     chip.title = t.hint || "";
-    chip.addEventListener("click", () => {
-      const box = $("goal");
-      box.value = t.goal;
-      box.focus();
-      box.setSelectionRange(0, 0);
-    });
+    chip.addEventListener("click", () => applyTemplateWithPrompt(t));
     host.appendChild(chip);
   }
 }
@@ -368,6 +389,36 @@ function exportOneHistory(r) {
   toast("已导出单条任务");
 }
 
+// Copy the shareable JSON of a single task to the clipboard (MV3 sidepanel is
+// a trusted page, so navigator.clipboard works without extra permissions).
+async function copyShareHistory(r) {
+  try {
+    const share = HistoryModule.buildShareRecord(r);
+    await navigator.clipboard.writeText(JSON.stringify(share, null, 2));
+    toast("分享 JSON 已复制");
+  } catch (e) {
+    toast("复制失败: " + (e && e.message || e));
+  }
+}
+
+// Save a finished task's goal as a reusable template (local template
+// marketplace closure: "share a task" -> "reuse it as a template").
+async function saveTaskAsTemplate(r) {
+  const label = prompt("给模板起个名字：", (r.goal || "我的模板").slice(0, 20));
+  if (label === null) return;
+  try {
+    const added = await TemplatesModule.addCustomTemplate({ label: label.trim() || "我的模板", goal: r.goal });
+    if (added) {
+      renderTemplates();
+      toast("已保存为模板");
+    } else {
+      toast("该模板已存在");
+    }
+  } catch (e) {
+    toast("保存失败: " + (e && e.message || e));
+  }
+}
+
 async function historyLog(goal) {
   if (!currentTask) return;
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
@@ -461,6 +512,24 @@ function renderHistory() {
         exportOneHistory(r);
       });
       actions.appendChild(shareBtn);
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "history-copy";
+      copyBtn.textContent = "复制";
+      copyBtn.title = "复制分享 JSON 到剪贴板";
+      copyBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        copyShareHistory(r);
+      });
+      actions.appendChild(copyBtn);
+      const tplBtn = document.createElement("button");
+      tplBtn.className = "history-template";
+      tplBtn.textContent = "存模板";
+      tplBtn.title = "把该任务目标保存为可复用模板";
+      tplBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        saveTaskAsTemplate(r);
+      });
+      actions.appendChild(tplBtn);
       const badge = document.createElement("span");
       badge.className = "history-status";
       badge.textContent = r.status;
@@ -597,6 +666,15 @@ async function startTask(resume) {
         appendLog("recover", "✗ 恢复用尽，步骤失败（点击计划面板失败步骤查看详情）");
       }
     },
+    onStepEvent: (ev) => {
+      if (!currentTask) return;
+      currentTask.stepEvents = currentTask.stepEvents || [];
+      currentTask.stepEvents.push(ev);
+      // 实时重绘：失败步骤的恢复记录随事件追加即时刷新
+      if (ev.type === "recovery" && ev.stepIndex !== undefined && planProgress.failed.includes(ev.stepIndex)) {
+        renderPlanPanel();
+      }
+    },
     onCheckpoint: (cp) => { if (currentTask) currentTask.resume = cp; },
     onProgress: (p) => {
       if (!currentTask) return;
@@ -606,6 +684,7 @@ async function startTask(resume) {
         planProgress.failed = [];
         planProgress.current = 0;
         planProgress.steps = p.steps;
+        expandedFailureStep = null;
       } else if (p.status === "done") {
         planProgress.steps = p.steps;
         planProgress.done.push(p.currentIndex);
