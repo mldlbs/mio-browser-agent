@@ -186,8 +186,8 @@ function wireAuthPopupListeners() {
   $("authRegister").addEventListener("click", async () => {
     const email = $("authEmail").value.trim();
     const password = $("authPassword").value;
-    const serverUrl = $("authServer").value.trim();
-    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
+    const serverUrl = SYNC_SERVER;
+    if (!email || !password) return toast("请填写邮箱和密码");
     try {
       await AuthClient.register(email, password, serverUrl);
       $("authPopup").hidden = true;
@@ -200,8 +200,8 @@ function wireAuthPopupListeners() {
   $("authLogin").addEventListener("click", async () => {
     const email = $("authEmail").value.trim();
     const password = $("authPassword").value;
-    const serverUrl = $("authServer").value.trim();
-    if (!email || !password || !serverUrl) return toast("请填写邮箱、密码和服务器地址");
+    const serverUrl = SYNC_SERVER;
+    if (!email || !password) return toast("请填写邮箱和密码");
     try {
       await AuthClient.login(email, password, serverUrl);
       $("authPopup").hidden = true;
