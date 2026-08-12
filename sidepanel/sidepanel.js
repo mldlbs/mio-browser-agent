@@ -6,7 +6,7 @@ let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
 let _historyPage = 0;
 let expandedFailureStep = null;
-const SYNC_SERVER = "https://mio-sync.example.com";
+const SYNC_SERVER = "https://sync.crlkcloud.cyou";
 
 function resetPlanProgress() {
   planProgress = { steps: [], done: [], failed: [], replanned: false };

@@ -1,5 +1,8 @@
 node_modules/
 *.log
+__pycache__/
+*.pyc
+server.zip
 .DS_Store
 Thumbs.db
 *.egg-info/
