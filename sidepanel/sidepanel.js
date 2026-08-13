@@ -6,7 +6,71 @@ let planCollapsed = false;
 let planProgress = { steps: [], done: [], failed: [], replanned: false };
 let _historyPage = 0;
 let expandedFailureStep = null;
+let _lastSuggestUrl = "";
 const SYNC_SERVER = "https://sync.crlkcloud.cyou";
+
+// Refresh the "本页可做" suggestions from the current page's snapshot. Pure
+// heuristic (no LLM): maps page element patterns to one-click task cards.
+async function renderSuggestions() {
+  const panel = $("suggestPanel");
+  const list = $("suggestList");
+  if (!panel || !list) return;
+  let peek;
+  try {
+    const bridge = createPageBridge();
+    peek = await bridge.snapshotPeek();
+  } catch (e) {
+    panel.hidden = true;
+    return;
+  }
+  if (!peek || !peek.elements || !peek.elements.length) {
+    panel.hidden = true;
+    return;
+  }
+  // Skip refresh if the page hasn't changed (e.g. user clicked 刷新 repeatedly).
+  const key = peek.url + "|" + peek.title;
+  if (key === _lastSuggestUrl) {
+    if (panel.hidden) panel.hidden = false;
+    return;
+  }
+  _lastSuggestUrl = key;
+  const tasks = SuggestModule.suggestTasks(peek);
+  if (!tasks.length) { panel.hidden = true; return; }
+  panel.hidden = false;
+  list.innerHTML = "";
+  const icons = { search: "🔍", login: "🔑", "extract-table": "📊", "form-fill": "📝", "extract-links": "🔗", "crawl-pages": "📄", "extract-text": "📃" };
+  tasks.forEach((t) => {
+    const item = document.createElement("div");
+    item.className = "suggest-task";
+    const icon = document.createElement("span");
+    icon.className = "icon";
+    icon.textContent = icons[t.id] || "✨";
+    const body = document.createElement("div");
+    const label = document.createElement("div");
+    label.className = "label";
+    label.textContent = t.label;
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = t.hint || "";
+    body.appendChild(label);
+    body.appendChild(hint);
+    item.appendChild(icon);
+    item.appendChild(body);
+    item.title = t.goal;
+    item.addEventListener("click", () => applyTemplateWithPrompt(t));
+    list.appendChild(item);
+  });
+}
+
+function wireSuggestListeners() {
+  const refresh = $("suggestRefresh");
+  if (refresh) refresh.addEventListener("click", () => { _lastSuggestUrl = ""; renderSuggestions(); });
+  // Re-suggest when the active tab changes or finishes loading.
+  chrome.tabs.onActivated.addListener(() => renderSuggestions());
+  chrome.tabs.onUpdated.addListener((_id, changeInfo) => {
+    if (changeInfo.status === "complete") renderSuggestions();
+  });
+}
 
 function resetPlanProgress() {
   planProgress = { steps: [], done: [], failed: [], replanned: false };
@@ -239,6 +303,8 @@ async function init() {
     verEl.textContent = "v" + (chrome.runtime.getManifest().version || "");
   }
   await renderTemplates();
+  wireSuggestListeners();
+  renderSuggestions();
   const s = await getSettings();  $("provider").value = s.provider;
   $("model").value = s.model;
   $("baseUrl").value = s.baseURL;

@@ -1,8 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Browser Agent",
+  "name": "mio — Browser Agent",
   "version": "0.1.46",
-  "description": "自然语言驱动的网页自动化 Agent：点击、输入、滚动、导航、提取。",
+  "description": "A natural-language browser agent that clicks, types, scrolls, navigates and extracts on live pages. Local-first, zero third-party deps.",
+  "homepage_url": "https://github.com/mldlbs/mio-browser-agent",
+  "minimum_chrome_version": "114",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "activeTab",
     "scripting",
@@ -18,7 +25,12 @@
     "service_worker": "background/service-worker.js"
   },
   "action": {
-    "default_title": "Browser Agent"
+    "default_title": "mio — Browser Agent",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "side_panel": {
     "default_path": "sidepanel/sidepanel.html"

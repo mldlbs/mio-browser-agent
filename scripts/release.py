@@ -17,8 +17,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST = os.path.join(REPO, "manifest.json")
 GITHUB_REPO = "mldlbs/mio-browser-agent"
 
-EXCLUDE_DIRS = {".git", ".github", "tests", "docs", "diagrams", "scripts"}
-EXCLUDE_FILES = {".gitignore", "README.md", "LICENSE"}
+EXCLUDE_DIRS = {".git", ".github", "tests", "docs", "diagrams", "scripts", "server"}
+EXCLUDE_FILES = {".gitignore", "README.md", "LICENSE", "PRIVACY.md", "DEPLOY_SERVER.md", "server.zip"}
 
 
 def manifest_version():

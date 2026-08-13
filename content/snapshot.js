@@ -201,6 +201,7 @@ function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
       index: elements.length,
       role: computeRole(el),
       name: computeAccessibleName(el),
+      inputType: (el.tagName === "INPUT" && el.type) ? String(el.type).toLowerCase() : "",
       placeholder: el.getAttribute("placeholder") || "",
       value: truncate(elementValue(el), 100),
       checked: !!el.checked,

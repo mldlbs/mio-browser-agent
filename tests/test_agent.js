@@ -6,6 +6,7 @@ const shadowMod = require("../content/shadow.js");
 const storage = require("../common/storage.js");
 const historyMod = require("../common/history.js");
 const templatesMod = require("../common/templates.js");
+const suggestMod = require("../common/suggest.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -475,6 +476,17 @@ function assertEq(got, want, name) {
   for (const r of many) await historyMod.addHistoryRecord(r);
   const capped = await historyMod.getHistory();
   assertEq(capped.length, historyMod.MAX_RECORDS, "history capped at MAX_RECORDS");
+  // With a sync session present, the cap relaxes to SYNC_MAX_RECORDS.
+  histStore.mioSession = { token: "t", email: "e", serverUrl: "https://sync.example.com" };
+  for (let i = 0; i < historyMod.MAX_RECORDS + 5; i++) await historyMod.addHistoryRecord({ id: "syn" + i, goal: "g" + i, status: "done" });
+  const synced = await historyMod.getHistory();
+  assert(synced.length > historyMod.MAX_RECORDS, "synced account relaxes the history cap");
+  assert(synced.length <= historyMod.SYNC_MAX_RECORDS, "synced history still bounded by SYNC_MAX_RECORDS");
+  assertEq(await historyMod.getMaxRecords(), historyMod.SYNC_MAX_RECORDS, "getMaxRecords returns SYNC cap when logged in");
+  assert(await historyMod.isSynced(), "isSynced true with session");
+  delete histStore.mioSession;
+  assertEq(await historyMod.getMaxRecords(), historyMod.MAX_RECORDS, "getMaxRecords falls back to LOCAL cap when logged out");
+  assert(!await historyMod.isSynced(), "isSynced false without session");
   await historyMod.clearHistory();
   assertEq((await historyMod.getHistory()).length, 0, "clearHistory empties storage");
   // P2: pinned / tags / update / filter / sort
@@ -2498,6 +2510,60 @@ function assertEq(got, want, name) {
     }
   );
   assert(escapeRes.ok, "agent escapes a risky tab by navigating and the step completes");
+
+  // ── task suggestions (common/suggest.js) ──
+  const mkEl = (o) => Object.assign({
+    index: 0, role: "generic", name: "", inputType: "", placeholder: "",
+    value: "", tag: "", href: "", text: "", disabled: false,
+  }, o);
+  const mkSnap = (title, elems) => ({ url: "https://example.com/", title, elements: elems });
+
+  // Search form: a "搜索" input + submit button → search suggestion.
+  let sug = suggestMod.suggestTasks(mkSnap("首页", [
+    mkEl({ role: "textbox", name: "搜索", placeholder: "请输入关键词" }),
+    mkEl({ role: "button", name: "搜索" }),
+  ]));
+  assert(sug.some((t) => t.id === "search"), "search box + button suggests a search task");
+
+  // Login form: password input detected via inputType.
+  sug = suggestMod.suggestTasks(mkSnap("登录", [
+    mkEl({ role: "textbox", name: "账号", inputType: "text" }),
+    mkEl({ role: "textbox", name: "密码", inputType: "password" }),
+    mkEl({ role: "button", name: "登录" }),
+  ]));
+  assert(sug.some((t) => t.id === "login"), "password input suggests a login task");
+  assert(!sug.some((t) => t.id === "search"), "login page does not also suggest search");
+
+  // Many links → extract-links suggestion.
+  sug = suggestMod.suggestTasks(mkSnap("目录", Array.from({ length: 12 }, (_, i) =>
+    mkEl({ role: "link", name: "链接" + i, href: "https://example.com/" + i })
+  )));
+  assert(sug.some((t) => t.id === "extract-links"), "12 links suggest extract-links");
+
+  // Table elements → extract-table suggestion.
+  sug = suggestMod.suggestTasks(mkSnap("报表", [
+    mkEl({ role: "table", tag: "table" }),
+    mkEl({ role: "cell", tag: "td" }),
+  ]));
+  assert(sug.some((t) => t.id === "extract-table"), "table elements suggest extract-table");
+
+  // 下一页/加载更多 → crawl-pages suggestion.
+  sug = suggestMod.suggestTasks(mkSnap("列表", [
+    mkEl({ role: "link", name: "下一页", href: "https://example.com/2" }),
+  ]));
+  assert(sug.some((t) => t.id === "crawl-pages"), "next-page link suggests crawl-pages");
+
+  // Every non-empty page gets a generic extract-text task, deduped.
+  sug = suggestMod.suggestTasks(mkSnap("任意", [
+    mkEl({ role: "textbox", name: "搜索", placeholder: "q" }),
+    mkEl({ role: "button", name: "搜索" }),
+  ]));
+  assert(sug.some((t) => t.id === "extract-text"), "always offers extract-text");
+  assert(sug.length === new Set(sug.map((t) => t.goal)).size, "suggestions dedupe by goal");
+  assert(suggestMod.suggestTasks(mkSnap("空", [])).length === 0, "empty page yields no suggestions");
+
+  // Password detection falls back to name/placeholder hints (no inputType).
+  assert(suggestMod.findLoginFields([mkEl({ role: "textbox", name: "用户名" }), mkEl({ role: "textbox", name: "密码" })]), "password hint detected by name");
 
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");

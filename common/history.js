@@ -1,5 +1,22 @@
 const HISTORY_KEY = "mioTaskHistory";
-const MAX_RECORDS = 50;
+const SESSION_KEY = "mioSession";
+const LOCAL_MAX_RECORDS = 50;
+// 已登录（启用云同步）时放开本地历史上限：记录全量保留在本机，服务器是异地备份。
+const SYNC_MAX_RECORDS = 500;
+const MAX_RECORDS = LOCAL_MAX_RECORDS;
+
+async function isSynced() {
+  if (!globalThis.chrome || !chrome.storage || !chrome.storage.local) return false;
+  try {
+    const raw = await chrome.storage.local.get(SESSION_KEY);
+    const s = raw && raw[SESSION_KEY];
+    return !!(s && s.serverUrl);
+  } catch (_) { return false; }
+}
+
+async function getMaxRecords() {
+  return (await isSynced()) ? SYNC_MAX_RECORDS : LOCAL_MAX_RECORDS;
+}
 
 function normalizeRecord(r) {
   return {
@@ -28,7 +45,7 @@ async function getHistory() {
 async function addHistoryRecord(record) {
   const list = await getHistory();
   list.unshift(normalizeRecord(record));
-  const trimmed = list.slice(0, MAX_RECORDS);
+  const trimmed = list.slice(0, await getMaxRecords());
   await chrome.storage.local.set({ [HISTORY_KEY]: trimmed });
   return trimmed;
 }
@@ -43,7 +60,7 @@ async function updateHistoryRecord(id, patch) {
 }
 
 async function _setRawHistory(list) {
-  await chrome.storage.local.set({ [HISTORY_KEY]: list.slice(0, MAX_RECORDS) });
+  await chrome.storage.local.set({ [HISTORY_KEY]: list.slice(0, await getMaxRecords()) });
 }
 
 function sortRecords(records) {
@@ -87,7 +104,8 @@ function buildShareRecord(r) {
 
 // Import records from an exported JSON (array of normalized records, or a
 // single record). Merges by id: existing ids are skipped, new ids are added at
-// the front, then the list is trimmed to MAX_RECORDS. Returns the merged list.
+// the front, then the list is trimmed to the current cap (50 local / 500 synced).
+// Returns the merged list.
 async function importRecords(raw) {
   let arr = raw;
   if (Array.isArray(raw)) arr = raw;
@@ -102,16 +120,19 @@ async function importRecords(raw) {
     existing.add(rec.id);
     incoming.push(rec);
   }
-  const merged = incoming.concat(list).slice(0, MAX_RECORDS);
+  const merged = incoming.concat(list).slice(0, await getMaxRecords());
   await chrome.storage.local.set({ [HISTORY_KEY]: merged });
   return merged;
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HISTORY_KEY, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, _setRawHistory, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord };
+  module.exports = { HISTORY_KEY, SESSION_KEY, LOCAL_MAX_RECORDS, SYNC_MAX_RECORDS, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, _setRawHistory, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord, isSynced, getMaxRecords };
 } else {
   globalThis.HistoryModule = {
     HISTORY_KEY,
+    SESSION_KEY,
+    LOCAL_MAX_RECORDS,
+    SYNC_MAX_RECORDS,
     MAX_RECORDS,
     normalizeRecord,
     getHistory,
@@ -123,5 +144,7 @@ if (typeof module !== "undefined") {
     clearHistory,
     importRecords,
     buildShareRecord,
+    isSynced,
+    getMaxRecords,
   };
 }

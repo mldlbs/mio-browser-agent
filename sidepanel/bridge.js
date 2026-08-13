@@ -48,6 +48,24 @@ async function listFrames() {
 
 function createPageBridge() {
   return {
+    // Lightweight main-frame-only snapshot for UI hints (task suggestions).
+    // Much faster than the full multi-frame snapshot; element indexes are
+    // NOT meant for action targeting (use snapshot() for that).
+    async snapshotPeek() {
+      const mainTab = await getActiveTab();
+      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true });
+      if (!res || res.type !== MSG.SNAPSHOT_RESPONSE) throw new Error("bad snapshot response");
+      const snap = res.payload.snapshot || {};
+      return {
+        url: mainTab.url || snap.url || "",
+        title: snap.title || mainTab.title || "",
+        elements: (snap.elements || []).map((e) => ({
+          role: e.role, name: e.name, inputType: e.inputType || "",
+          placeholder: e.placeholder || "", value: e.value || "",
+          tag: e.tag || "", href: e.href || "", text: e.text || "",
+        })),
+      };
+    },
     async snapshot() {
       const frames = await listFrames();
       const main = frames.find((f) => f.frameId === 0);

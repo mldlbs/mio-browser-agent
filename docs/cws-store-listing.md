@@ -4,23 +4,23 @@
 
 ## 前置
 
-- [x] 注册 Google 开发者账号，一次性付费 **$5** → https://chrome.google.com/webstore/devconsole
+- [ ] 注册 Google 开发者账号，一次性付费 **$5** → https://chrome.google.com/webstore/devconsole
 - [x] 公开 GitHub 仓库 `mldlbs/mio-browser-agent`（已存在）
 - [x] 隐私政策已托管：`https://github.com/mldlbs/mio-browser-agent/blob/main/PRIVACY.md`（需 commit + push 后生效）
 
-## 代码侧（已完成）
+## 代码侧
 
-- [x] `manifest.json`：补 `icons`（16/48/128）+ `action.default_icon` + `homepage_url`
+- [x] `manifest.json`：补 `icons`（16/48/128）+ `action.default_icon` + `homepage_url` + `minimum_chrome_version`
 - [x] 名称改为 `mio — Browser Agent`（商店搜索可用）
 - [x] 描述改英文（商店面向全球）
-- [x] 版本 bump 至 `0.1.41`
 - [x] 零 eval / 零远程代码 / 无 webRequest 拦截 → 满足 MV3 审核
+- [x] `PRIVACY.md` 已如实披露可选云同步（`sync.crlkcloud.cyou`）——审核必查隐私政策与实现一致性
 
 ## 商店素材（生成于 `D:\Users\gf1913\Temp\opencode\cws-assets\`）
 
 - [x] `promo-small.png` 440x280（必填）
 - [x] `promo-marquee.png` 1400x560（选填，建议传）
-- [ ] 截图 x5：1280x800 或 640x400，需真实浏览器截图（建议抓 4 张：侧边面板、任务执行日志、恢复引擎场景、设置页）
+- [ ] 截图 x5：1280x800 或 640x400，需真实浏览器截图（建议抓 4 张：侧边面板 + 本页可做推荐、任务执行日志、恢复引擎场景、设置页）
 
 ## 商店文案
 
@@ -39,26 +39,31 @@ mio is a browser agent you talk to. Open the side panel, type what you want —
 "search for hello and click submit", "fill this form", "scroll and extract the
 article" — and mio plans the steps and executes them on the real page.
 
+When you open a page, mio suggests what can be done on it ("本页可做"), so you
+don't even have to describe a task to get started.
+
 It runs entirely in your browser:
 - Zero third-party dependencies (no SDKs, no bundles, all hand-written JS)
 - Bring your own LLM (OpenAI-compatible endpoint; point it at a local Ollama to stay fully offline)
-- No cloud account, no phone-home, no analytics. Page data goes only to the endpoint you configure.
+- No account required, no phone-home, no analytics. Page data goes only to the endpoint you configure.
+- Optional cloud sync (opt-in, account required) to back up task history across devices
 - Open source (MIT) on GitHub
 
 Built for:
-- Developers automating repetitive web tasks
-- QA and efficiency users scripting multi-step flows
+- Anyone automating repetitive web tasks (filling forms, checking pages, extracting data)
+- Developers and QA scripting multi-step flows
 - Privacy-conscious users who want a local agent
 
 What it can do:
 - Click, type, paste, scroll, navigate, switch tabs, extract text
+- Suggest tasks from the current page with one-click cards
 - Plan multi-step tasks with a recovery engine (finds alternate elements and retries instead of failing)
 - Remember context across steps and pages
 - Read CAPTCHAs by asking the human (never solves them in the background)
 ```
 
 ### 类别
-`Developer Tools`（开发者工具）
+`Productivity` 或 `Developer Tools`（二选一，建议 Productivity——面向小白）
 
 ### 隐私政策 URL
 ```
@@ -84,13 +89,13 @@ All data stays local or goes to the user-configured LLM endpoint. See PRIVACY.md
 
 ## 上传步骤
 
-1. 打开 devconsole → New Item → 上传 `chrome-ext-agent/` 打包的 zip（**注意：商店上传用**未签名 **zip，不是自签名 crx**）
+1. 打开 devconsole → New Item → 上传 zip（**商店上传用**未签名 **zip，不是自签名 crx**）
    ```bash
-   # 生成商店 zip（用 release.py 的 build_zip 逻辑即可，但不要签名 crx）
+   python scripts/release.py --help  # 或直接用 build_zip 逻辑
    python -c "
    import sys; sys.path.insert(0, 'scripts')
    from release import build_zip
-   z, n = build_zip('.', '0.1.41', r'D:\Users\gf1913\Temp\opencode')
+   z, n = build_zip('.', '0.1.46', r'D:\Users\gf1913\Temp\opencode')
    print(z, n)
    "
    ```

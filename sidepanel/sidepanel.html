@@ -216,6 +216,58 @@
       gap: 6px;
       margin-bottom: 8px;
     }
+    .suggest-panel {
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: var(--radius);
+      padding: 8px 10px;
+    }
+    .suggest-head {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--lavender);
+      letter-spacing: .05em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .suggest-head .refresh {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--surface);
+      border-radius: 6px;
+      color: var(--overlay);
+      padding: 1px 8px;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .suggest-head .refresh:hover { color: var(--text); border-color: var(--overlay); }
+    .suggest-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 200px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--surface) transparent;
+    }
+    .suggest-task {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 8px;
+      border: 1px solid var(--surface);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all .15s;
+      background: var(--crust);
+    }
+    .suggest-task:hover { border-color: var(--mauve); background: rgba(203,166,247,.06); }
+    .suggest-task .icon { flex: none; font-size: 13px; }
+    .suggest-task .label { font-size: 12px; color: var(--text); font-weight: 600; }
+    .suggest-task .hint { font-size: 10px; color: var(--overlay); margin-top: 1px; }
+    .suggest-empty { font-size: 11px; color: var(--overlay); padding: 4px 2px; }
     .template-chip {
       font-size: 11px;
       padding: 3px 10px;
@@ -697,6 +749,14 @@
   </header>
 
   <main>
+    <section class="suggest-panel" id="suggestPanel" hidden>
+      <div class="suggest-head">
+        <span>本页可做</span>
+        <button class="refresh" id="suggestRefresh" title="刷新页面任务推荐">刷新</button>
+      </div>
+      <div class="suggest-list" id="suggestList"></div>
+    </section>
+
     <section class="compose">
       <div class="compose-templates" id="composeTemplates"></div>
       <textarea id="goal" placeholder="告诉 mio 你想做什么…&#10;例如：在搜索框输入 hello 并点击提交"></textarea>
@@ -773,6 +833,7 @@
   <script src="../common/auth-client.js"></script>
   <script src="../common/history.js"></script>           
   <script src="../common/templates.js"></script>        
+  <script src="../common/suggest.js"></script>
   <script src="recovery-events.js"></script>             
   <script src="vision.js"></script>
   <script src="../llm/adapter.js"></script>              
