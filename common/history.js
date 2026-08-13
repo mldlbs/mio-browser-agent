@@ -1,5 +1,7 @@
 const HISTORY_KEY = "mioTaskHistory";
-const SESSION_KEY = "mioSession";
+// 与 auth-client.js 的 SESSION_KEY 同值；此处独立命名避免浏览器全局 script
+// 加载时 const 重名冲突（Node require 模块作用域下无碍，但 <script> 会污染全局）。
+const SYNC_SESSION_KEY = "mioSession";
 const LOCAL_MAX_RECORDS = 50;
 // 已登录（启用云同步）时放开本地历史上限：记录全量保留在本机，服务器是异地备份。
 const SYNC_MAX_RECORDS = 500;
@@ -8,8 +10,8 @@ const MAX_RECORDS = LOCAL_MAX_RECORDS;
 async function isSynced() {
   if (!globalThis.chrome || !chrome.storage || !chrome.storage.local) return false;
   try {
-    const raw = await chrome.storage.local.get(SESSION_KEY);
-    const s = raw && raw[SESSION_KEY];
+    const raw = await chrome.storage.local.get(SYNC_SESSION_KEY);
+    const s = raw && raw[SYNC_SESSION_KEY];
     return !!(s && s.serverUrl);
   } catch (_) { return false; }
 }
@@ -126,11 +128,11 @@ async function importRecords(raw) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { HISTORY_KEY, SESSION_KEY, LOCAL_MAX_RECORDS, SYNC_MAX_RECORDS, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, _setRawHistory, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord, isSynced, getMaxRecords };
+  module.exports = { HISTORY_KEY, SYNC_SESSION_KEY, LOCAL_MAX_RECORDS, SYNC_MAX_RECORDS, MAX_RECORDS, normalizeRecord, getHistory, addHistoryRecord, updateHistoryRecord, _setRawHistory, sortRecords, filterRecords, clearHistory, importRecords, buildShareRecord, isSynced, getMaxRecords };
 } else {
   globalThis.HistoryModule = {
     HISTORY_KEY,
-    SESSION_KEY,
+    SYNC_SESSION_KEY,
     LOCAL_MAX_RECORDS,
     SYNC_MAX_RECORDS,
     MAX_RECORDS,
