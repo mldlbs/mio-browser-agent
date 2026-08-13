@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "mio — Browser Agent",
   "version": "0.1.46",
-  "description": "A natural-language browser agent that clicks, types, scrolls, navigates and extracts on live pages. Local-first, zero third-party deps.",
+  "description": "A natural-language browser agent that clicks, types, scrolls, navigates and extracts on live pages. Local-first, zero deps.",
   "homepage_url": "https://github.com/mldlbs/mio-browser-agent",
   "minimum_chrome_version": "114",
   "icons": {
