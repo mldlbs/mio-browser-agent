@@ -26,12 +26,49 @@ function parsePlanResponse(resp) {
   return steps;
 }
 
+// Split a goal that EXPLICITLY declares numbered stages/phases into one step
+// per stage. Long multi-phase tasks (e.g. "阶段1…阶段2…阶段3…") collapse into a
+// single LLM plan step far too often, which kills per-stage recovery: one
+// failed action fails the WHOLE task and everything re-runs from scratch.
+// Detecting the explicit stage markers client-side is a cheap, deterministic
+// guard the LLM can't skip. Returns [] when no stage markers are found.
+function splitStages(goal) {
+  const text = String(goal || "");
+  // Match "阶段N" / "步骤N" / "Phase N" / "Stage N" / "Step N" (also 阶段 N with space).
+  const re = /(?:阶段|步骤|第[一二三四五六七八九十\d]+步|Phase|Stage|Step)\s*(\d+|[一二三四五六七八九十])/gi;
+  const matches = [];
+  let m;
+  while ((m = re.exec(text))) {
+    const start = m.index;
+    if (matches.length && start === matches[matches.length - 1].start) continue;
+    matches.push({ start, label: m[0] });
+  }
+  if (matches.length < 2) return [];
+  const descs = [];
+  for (let i = 0; i < matches.length; i++) {
+    const from = matches[i].start;
+    const to = i + 1 < matches.length ? matches[i + 1].start : text.length;
+    const chunk = text.slice(from, to).trim();
+    if (chunk) descs.push(chunk.slice(0, 400));
+  }
+  // Only treat it as a staged plan if there are at least 2 non-empty chunks,
+  // and the markers look like a deliberate structure (labels ordered).
+  if (descs.length < 2) return [];
+  return descs.map((d) => ({ description: d }));
+}
+
 async function plan(goal, llm) {
   const resp = await llm.generate(
     [{ role: "system", content: PLAN_PROMPT }, { role: "user", content: `Goal: ${goal}` }],
     { tools: PLAN_TOOLS }
   );
   const steps = parsePlanResponse(resp);
+  // If the LLM collapsed a staged goal into a single step, fall back to the
+  // explicit stage boundaries so each phase is independently retryable.
+  if (steps.length <= 1) {
+    const staged = splitStages(goal);
+    if (staged.length >= 2) return { goal, steps: staged };
+  }
   if (!steps.length) return { goal, steps: [{ description: goal }] };
   return { goal, steps };
 }
@@ -79,7 +116,7 @@ async function replan(goal, failedStep, llm, ctx) {
   return { goal, steps };
 }
 
-const planner = { plan, replan, parsePlanResponse, replanGuidance };
+const planner = { plan, replan, parsePlanResponse, replanGuidance, splitStages };
 if (typeof module !== "undefined") {
   module.exports = planner;
 } else {

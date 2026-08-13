@@ -2565,6 +2565,36 @@ function assertEq(got, want, name) {
   // Password detection falls back to name/placeholder hints (no inputType).
   assert(suggestMod.findLoginFields([mkEl({ role: "textbox", name: "用户名" }), mkEl({ role: "textbox", name: "密码" })]), "password hint detected by name");
 
+  // ── planner stage splitting (P0: 长任务阶段拆分) ──
+  const stagedGoal = [
+    "阶段1 打开编辑器：打开 https://editor.csdn.net/md/ 等加载",
+    "阶段2 填标题与正文：在标题框输入标题，粘贴正文",
+    "阶段3 提交发布：点击发布按钮",
+  ].join("\n");
+  const staged = plannerMod.splitStages(stagedGoal);
+  assertEq(staged.length, 3, "splitStages splits 阶段1/2/3 into 3 steps");
+  assert(staged[0].description.includes("打开编辑器"), "splitStages keeps stage1 text");
+  assert(staged[2].description.includes("提交发布"), "splitStages keeps stage3 text");
+  assertEq(plannerMod.splitStages("在搜索框输入 hello 并点击提交").length, 0, "splitStages ignores plain goals");
+  assertEq(plannerMod.splitStages("做一件事\n第二行文字").length, 0, "splitStages ignores text without stage markers");
+  // Fallback: LLM collapsing a staged goal to one step must trigger the split.
+  const collapseLlm = mockLlm([() => ({ content: "", toolCalls: [makeToolCall("submit_plan", { steps: [{ description: "发布文章" }] })] })]);
+  const splitPlan = await plannerMod.plan(stagedGoal, collapseLlm);
+  assert(splitPlan.steps.length >= 3, "plan falls back to stage splitting when LLM collapses to one step");
+  // Normal single-goal tasks still work (no false split).
+  const plainLlm = mockLlm([() => ({ content: "", toolCalls: [makeToolCall("submit_plan", { steps: [{ description: "搜索并提交" }] })] })]);
+  const plainPlan = await plannerMod.plan("在搜索框输入 hello", plainLlm);
+  assertEq(plainPlan.steps.length, 1, "plain goal keeps LLM's single step");
+
+  // ── title field key (P0: 标题框识别) ──
+  const fields = require("../common/fields.js");
+  const titleMatch = fields.matchField("title", { role: "textbox", name: "", placeholder: "请输入文章标题" });
+  assert(titleMatch.quality === "synonym", "matchField title hits 标题 placeholder");
+  const titleExact = fields.matchField("title", { role: "textbox", name: "标题" });
+  assert(titleExact.quality === "exact" || titleExact.quality === "synonym", "matchField title matches name=标题");
+  const titleMiss = fields.matchField("title", { role: "textbox", name: "用户名" });
+  assertEq(titleMiss.quality, "none", "matchField title does not hit username");
+
   if (failures > 0) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== ALL PASS ===");
 })();
