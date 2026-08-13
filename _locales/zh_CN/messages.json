@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "mio — 浏览器助手"
+  },
+  "extDescription": {
+    "message": "自然语言驱动的浏览器 Agent：点击、输入、滚动、导航、提取，全部本地运行。"
+  }
+}

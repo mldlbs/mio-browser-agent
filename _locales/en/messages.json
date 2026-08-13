@@ -1,0 +1,8 @@
+{
+  "extName": {
+    "message": "mio — Browser Agent"
+  },
+  "extDescription": {
+    "message": "A natural-language browser agent that clicks, types, scrolls, navigates and extracts on live pages. Local-first, zero deps."
+  }
+}
