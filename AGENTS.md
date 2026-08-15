@@ -86,7 +86,7 @@ node tests/cdp/cws-screenshots.js  # 商店截图
 
 ## 已知坑
 
-- `git push` 需 `-c http.proxy= -c https.proxy=` 绕过失效的本地代理（127.0.0.1:26773/61386 已死）。
+- `git push` 需绕过直连失败与凭据弹窗。当前可用：系统代理 `127.0.0.1:48521`；命令：`$env:GIT_TERMINAL_PROMPT="0"; git -c credential.helper= -c http.proxy="http://127.0.0.1:48521" -c https.proxy="http://127.0.0.1:48521" push <URL-x-access-token> main`。remote URL 已内嵌 GitHub token（`ghp_...@github.com`），但 GCM（manager-core）会拦截弹窗，必须 `-c credential.helper=` 禁用。已实测 2026-08-15 推送 10 个 commit 成功。直连 github.com:443 超时不可用。
 - 浏览器全局 script 加载会共享 const：跨文件顶层常量需唯一命名（SESSION_KEY 冲突已修）。
 - headless Chrome 截图：CDP `--load-extension` 在 temp profile 下不注入 MV3 content scripts。
 - 记忆服务（hermes-memory MCP）当前返回损坏 JSON，不可用。
