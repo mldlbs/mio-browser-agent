@@ -10,6 +10,7 @@ const suggestMod = require("../common/suggest.js");
 const taskMemoryMod = require("../common/task-memory.js");
 const schedulerMod = require("../common/scheduler.js");
 const errorMsgMod = require("../common/error-msg.js");
+const toolLabelsMod = require("../common/tool-labels.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -1504,6 +1505,34 @@ function assertEq(got, want, name) {
   const enf = policy.getAllowedActions("ELEMENT_NOT_FOUND");
   assert(enf[0].action === "wait_and_retry", "ELEMENT_NOT_FOUND first recovery is wait (transient page render)");
   assert(enf.some((a) => a.action === "retry_snapshot"), "ELEMENT_NOT_FOUND still retries snapshot after wait");
+
+  // ══ 工具调用人话化（common/tool-labels.js）══
+  assertEq(toolLabelsMod.toolNameToChinese("click"), "点击", "toolNameToChinese maps click");
+  assertEq(toolLabelsMod.toolNameToChinese("type"), "输入", "toolNameToChinese maps type");
+  assertEq(toolLabelsMod.toolNameToChinese("weird_tool"), "weird_tool", "toolNameToChinese falls back to raw name");
+  const typeDesc = toolLabelsMod.describeToolCall("type", { text: "hello" });
+  assert(typeDesc.includes("输入") && typeDesc.includes("hello"), "describeToolCall renders type+text (got " + JSON.stringify(typeDesc) + ")");
+  const navDesc = toolLabelsMod.describeToolCall("navigate", { url: "https://example.com" });
+  assert(navDesc.includes("打开网页") && navDesc.includes("example.com"), "describeToolCall renders navigate (got " + JSON.stringify(navDesc) + ")");
+  const clickDesc = toolLabelsMod.describeToolCall("click", { index: 3 });
+  assert(clickDesc.includes("点击"), "describeToolCall renders click");
+  const scrollDown = toolLabelsMod.describeToolCall("scroll", { delta: 400 });
+  assert(scrollDown.includes("向下滚动"), "describeToolCall scroll down");
+  const scrollUp = toolLabelsMod.describeToolCall("scroll", { delta: -200 });
+  assert(scrollUp.includes("向上滚动"), "describeToolCall scroll up");
+  const tabOpen = toolLabelsMod.describeToolCall("tab", { mode: "open", url: "https://x.com" });
+  assert(tabOpen.includes("新标签页"), "describeToolCall tab open");
+  const memoSet = toolLabelsMod.describeToolCall("memo", { mode: "set", key: "价格" });
+  assert(memoSet.includes("价格"), "describeToolCall memo set");
+  const captcha = toolLabelsMod.describeToolCall("read_captcha", {});
+  assert(captcha.includes("验证码"), "describeToolCall read_captcha");
+  const form = toolLabelsMod.describeToolCall("form_fill", { fields: { username: "u", password: "p" } });
+  assert(form.includes("2 项"), "describeToolCall form_fill counts fields");
+  const coords = toolLabelsMod.describeToolCall("click_at", { x: 100, y: 200 });
+  assert(coords.includes("100") && coords.includes("200"), "describeToolCall click_at coords");
+  const waitSel = toolLabelsMod.describeToolCall("wait", { selector: ".btn" });
+  assert(waitSel.includes("等待"), "describeToolCall wait selector");
+  assertEq(toolLabelsMod.describeToolCall("extract_text", {}), "读取页面文字", "describeToolCall extract_text");
 
   // ══ Phase 2: recovery actions wired through executor ══
   // retry_snapshot: transient element-not-found on first turn → recovery retries → success on next turn

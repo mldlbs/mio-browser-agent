@@ -278,7 +278,10 @@ async function executeStep(step, ctx) {
       
       ctx.history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
       const shown = result.value == null ? "ok" : (typeof result.value === "string" ? result.value.slice(0, 120) : JSON.stringify(result.value).slice(0, 120));
-      onLog("tool", `${tc.name} → ${result.ok ? shown : "ERR " + result.error}`);
+      // 人话化：把 click → done 翻译成「点击页面元素 ✓」等小白可读描述
+      const labelsMod = (typeof module !== "undefined" ? require("../common/tool-labels.js") : globalThis.ToolLabelsModule) || null;
+      const desc = labelsMod ? labelsMod.describeToolCall(tc.name, tc.args) : tc.name;
+      onLog("tool", `${result.ok ? "✓ " : "✗ "}${desc}${result.ok && shown !== "ok" && shown !== "done" ? "（" + shown + "）" : ""}${!result.ok ? " — " + result.error : ""}`);
 
       // ── Click_at spam guard ──
       // If the agent clicks via click_at and the page did not change at all

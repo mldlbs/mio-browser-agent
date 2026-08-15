@@ -15,6 +15,7 @@ importScripts(
   "../common/storage.js",
   "../common/error-msg.js",
   "../common/fields.js",
+  "../common/tool-labels.js",
   "../common/history.js",
   "../common/task-memory.js",
   "../common/scheduler.js",
