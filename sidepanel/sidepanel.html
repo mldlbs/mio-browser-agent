@@ -813,7 +813,10 @@
       overflow-y: auto;
     }
     .sched-form .full { grid-column: 1 / -1; }
-    .sched-form-row { display: flex; flex-direction: column; gap: 3px; }
+    .sched-form-row { flex-direction: column; gap: 3px; }
+    /* display 留到 [hidden] 分支处理，避免覆盖 hidden 属性导致行常显 */
+    .sched-form-row[hidden] { display: none; }
+    .sched-form-row:not([hidden]) { display: flex; }
     .sched-form-row textarea {
       width: 100%;
       min-height: 46px;
@@ -862,11 +865,14 @@
       z-index: 200;
       background: rgba(17,17,27,.86);
       backdrop-filter: blur(3px);
-      display: flex;
       align-items: center;
       justify-content: center;
       padding: 20px;
     }
+    /* 注意：必须保留 [hidden] 覆盖，否则 display:flex 会盖过 hidden 属性，
+       遮罩永远显示并挡住整个侧边栏（引导页点击无反应）。 */
+    .onboard-mask[hidden] { display: none; }
+    .onboard-mask:not([hidden]) { display: flex; }
     .onboard-card {
       width: 100%;
       max-width: 340px;
