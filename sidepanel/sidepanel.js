@@ -273,6 +273,18 @@ async function renderTemplates() {
   if (!host) return;
   const tmpls = (globalThis.TemplatesModule && await TemplatesModule.getTemplates()) || [];
   host.innerHTML = "";
+  // 折叠开关：默认只露「模板 ▸」，展开显示全部模板 chips + 导入
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.id = "templatesToggle";
+  toggleBtn.className = "template-import";
+  toggleBtn.textContent = "模板 ▸";
+  toggleBtn.addEventListener("click", () => {
+    const collapsed = host.classList.toggle("collapsed");
+    toggleBtn.textContent = collapsed ? "模板 ▸" : "模板 ▾";
+  });
+  host.appendChild(toggleBtn);
+  host.classList.add("collapsed");
   for (const t of tmpls) {
     const wrap = document.createElement("div");
     wrap.className = "template-wrap";
@@ -449,6 +461,25 @@ async function init() {
 
   $("start").addEventListener("click", startTask);
   $("stop").addEventListener("click", () => { if (runtime) runtime.stop(); });
+  // 更多菜单（渐进式披露：历史/定时收进下拉）
+  const moreToggle = $("moreToggle");
+  const morePopup = $("morePopup");
+  if (moreToggle && morePopup) {
+    moreToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      morePopup.hidden = !morePopup.hidden;
+    });
+    document.addEventListener("click", (e) => {
+      const menu = morePopup;
+      const btn = moreToggle;
+      if (menu && !menu.hidden && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.hidden = true;
+      }
+    });
+    const closeMore = () => { morePopup.hidden = true; };
+    $("historyToggle").addEventListener("click", closeMore);
+    $("schedToggle").addEventListener("click", closeMore);
+  }
   $("historyToggle").addEventListener("click", toggleHistory);
   $("historyClose").addEventListener("click", toggleHistory);
   $("historyClear").addEventListener("click", clearHistory);                                                

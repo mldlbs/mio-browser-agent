@@ -236,6 +236,7 @@ async function main() {
         const log = document.getElementById('log'); log.innerHTML = '';
       })()`],
       ["screenshot-history.png", `(async () => {
+        document.getElementById('moreToggle').click();
         document.getElementById('historyToggle').click();
       })()`],
     ];

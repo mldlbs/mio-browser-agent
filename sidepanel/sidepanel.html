@@ -399,6 +399,50 @@
     #start:disabled { background: var(--surface); color: var(--overlay); box-shadow: none; }
     #stop { background: transparent; color: var(--red); border-color: rgba(243,139,168,.35); }
 
+    /* 更多菜单（渐进式披露：历史/定时收进下拉，保持首屏极简） */
+    .more-menu { position: relative; flex: none; }
+    #moreToggle {
+      width: 44px;
+      background: transparent;
+      color: var(--subtext);
+      border-color: var(--surface);
+      font-size: 16px;
+      line-height: 1;
+      padding: 8px 0;
+    }
+    .more-popup {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 6px);
+      z-index: 120;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: 10px;
+      padding: 6px;
+      min-width: 150px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+    }
+    .more-popup button {
+      background: transparent;
+      border: none;
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .more-popup button:hover { background: var(--surface); transform: none; filter: none; }
+    .more-popup button.disabled { opacity: .5; cursor: not-allowed; }
+
+    /* 模板行折叠：默认只露一个「模板」chip，展开后才显示全部模板 */
+    .compose-templates { position: relative; }
+    .compose-templates.collapsed .template-wrap,
+    .compose-templates.collapsed .template-import { display: none; }
+    #templatesToggle { display: inline-flex; }
+
     /* settings */
     details.settings {
       background: var(--mantle);
@@ -1028,13 +1072,20 @@
     </section>
 
     <section class="compose">
-      <div class="compose-templates" id="composeTemplates"></div>
+      <div class="compose-templates" id="composeTemplates" hidden>
+        <button id="templatesToggle" class="template-import" title="展开/收起模板">模板 ▸</button>
+      </div>
       <textarea id="goal" placeholder="告诉 mio 你想做什么…&#10;例如：在搜索框输入 hello 并点击提交"></textarea>
       <div class="compose-actions">
         <button id="start">开始任务</button>
         <button id="stop">停止</button>
-        <button id="historyToggle" title="查看历史任务记录">历史</button>
-        <button id="schedToggle" title="配置定时/周期任务" class="sched-toggle">⏰ 定时</button>
+        <div class="more-menu">
+          <button id="moreToggle" title="更多功能">⋯</button>
+          <div class="more-popup" id="morePopup" hidden>
+            <button id="historyToggle" title="查看历史任务记录">历史</button>
+            <button id="schedToggle" title="配置定时/周期任务">⏰ 定时任务</button>
+          </div>
+        </div>
       </div>
     </section>
 
