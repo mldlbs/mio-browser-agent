@@ -535,6 +535,69 @@
     .plan-step.failed:hover { background: rgba(243, 139, 168, 0.12); }
     .step-failure-detail { margin: 2px 0 6px 24px; padding: 6px 10px; background: rgba(243, 139, 168, 0.06); border-left: 2px solid #f38ba8; border-radius: 4px; font-size: 11px; line-height: 1.5; white-space: pre-wrap; color: #cdd6f4; }
 
+    /* 结果卡片：任务结束后的醒目反馈（成功绿/失败红 + 摘要 + 快捷操作） */
+    .result-card {
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border-radius: var(--radius);
+      background: rgba(166,227,161,.07);
+      border: 1px solid rgba(166,227,161,.4);
+      animation: onboard-pop .25s ease;
+    }
+    /* 必须保留 [hidden] 覆盖，否则 display:flex 盖过 hidden 属性（同 onboarding bug） */
+    .result-card[hidden] { display: none; }
+    .result-card:not([hidden]) { display: flex; }
+    .result-card.error {
+      background: rgba(243,139,168,.07);
+      border-color: rgba(243,139,168,.4);
+    }
+    .result-icon {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      font-weight: 700;
+      background: rgba(166,227,161,.15);
+      color: var(--green);
+      border: 1px solid rgba(166,227,161,.4);
+    }
+    .result-card.error .result-icon {
+      background: rgba(243,139,168,.15);
+      color: var(--red);
+      border-color: rgba(243,139,168,.4);
+    }
+    .result-body { flex: 1; min-width: 0; }
+    .result-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .result-summary {
+      font-size: 11.5px;
+      color: var(--subtext);
+      margin-top: 4px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    .result-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .result-actions button {
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: transparent;
+    }
+    #resultCopy { color: var(--teal); border-color: rgba(148,226,213,.35); }
+    #resultTemplate { color: var(--yellow, #f9e2af); border-color: rgba(249,226,175,.35); }
+    #resultRerun { color: var(--mauve); border-color: rgba(203,166,247,.4); }
+    #resultCopy:hover { background: rgba(148,226,213,.12); }
+    #resultTemplate:hover { background: rgba(249,226,175,.12); }
+    #resultRerun:hover { background: rgba(203,166,247,.12); }
+
     /* log */
     .log-wrap {
       flex: 1;
@@ -1163,6 +1226,19 @@
     </div>
 
     <div class="plan-panel" id="planPanel" hidden></div>
+
+    <div class="result-card" id="resultCard" hidden>
+      <div class="result-icon" id="resultIcon">✓</div>
+      <div class="result-body">
+        <div class="result-title" id="resultTitle">任务完成</div>
+        <div class="result-summary" id="resultSummary"></div>
+        <div class="result-actions">
+          <button id="resultCopy" title="复制结果到剪贴板">复制结果</button>
+          <button id="resultTemplate" title="保存为可复用模板">存模板</button>
+          <button id="resultRerun" title="用同样目标重新执行">再跑一次</button>
+        </div>
+      </div>
+    </div>
 
     <div class="log-wrap" id="log"></div>
   </main>

@@ -1068,6 +1068,46 @@ function updateHistoryPager(total, totalPages) {
   $("historyPageInfo").textContent = (_historyPage + 1) + " / " + totalPages + "（共 " + total + " 条）";
 }
 
+// 结果卡片：任务结束后给小白一个醒目的完成/失败反馈 + 快捷操作。
+function showResultCard(result, goal) {
+  const card = $("resultCard");
+  if (!card) return;
+  const ok = !!result.ok;
+  const summary = ok ? (result.summary || "任务完成") : (result.error || "任务失败");
+  const cardGoal = goal;
+  card.hidden = false;
+  card.classList.toggle("error", !ok);
+  $("resultIcon").textContent = ok ? "✓" : "✗";
+  $("resultTitle").textContent = ok ? "任务完成" : "任务未完成";
+  $("resultSummary").textContent = summary;
+  // 重新绑定操作（避免重复监听累积）
+  const copyBtn = $("resultCopy");
+  const tplBtn = $("resultTemplate");
+  const rerunBtn = $("resultRerun");
+  copyBtn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(summary);
+      toast("结果已复制");
+    } catch (_) { toast("复制失败"); }
+  };
+  tplBtn.onclick = async () => {
+    const label = prompt("给模板起个名字：", (cardGoal || "我的模板").slice(0, 20));
+    if (label === null) return;
+    const added = await TemplatesModule.addCustomTemplate({ label: label.trim() || "我的模板", goal: cardGoal });
+    if (added) { await renderTemplates(); toast("已保存为模板"); }
+    else toast("该模板已存在");
+  };
+  rerunBtn.onclick = () => {
+    card.hidden = true;
+    startTask({ goal: cardGoal });
+  };
+}
+
+function hideResultCard() {
+  const card = $("resultCard");
+  if (card) card.hidden = true;
+}
+
 async function startTask(resume) {
   if ($("start").disabled) return;
   const goal = resume && resume.goal ? resume.goal : $("goal").value.trim();
@@ -1102,6 +1142,7 @@ async function startTask(resume) {
   }
 
   $("log").innerHTML = "";
+  hideResultCard();
   appendLog("user", goal);
   setStatus("planning", "running");
   $("start").disabled = true;
@@ -1188,6 +1229,7 @@ async function startTask(resume) {
     currentTask.finishedAt = Date.now();
     if (!result.ok && result.resume) currentTask.resume = result.resume;
     await historyLog(goal);
+    showResultCard(result, goal);
     setStatus(currentTask.status, currentTask.status);
   } catch (e) {
     currentTask.status = "error";
@@ -1195,6 +1237,7 @@ async function startTask(resume) {
     currentTask.finishedAt = Date.now();
     await historyLog(goal);
     appendLog("error", e.message || String(e));
+    showResultCard({ ok: false, error: (e && e.message) || String(e) }, goal);
     setStatus("error", "error");
   } finally {
     $("start").disabled = false;
