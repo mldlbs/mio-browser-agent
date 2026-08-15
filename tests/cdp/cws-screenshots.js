@@ -32,6 +32,7 @@ const CHROME_MOCK = `
     mioCustomTemplates: [],
     mioTaskHistory: [],
     mioSession: null,
+    mioOnboardingDone: true,
   };
   const FAKE_SNAPSHOT = {
     type: "SNAPSHOT_RESPONSE",
@@ -49,7 +50,11 @@ const CHROME_MOCK = `
     } },
   };
   globalThis.chrome = {
-    runtime: { getManifest: () => ({ version: "0.1.46" }) },
+    runtime: {
+      getManifest: () => ({ version: "0.1.50" }),
+      onMessage: { addListener() {} },
+      sendMessage: async () => {},
+    },
     storage: {
       local: {
         async get(key) { return { [key]: store[key] }; },
@@ -59,6 +64,7 @@ const CHROME_MOCK = `
     },
     tabs: {
       query: async () => [{ id: 1, url: "https://example.com/search?q=keyboard", title: "搜索结果 · 示例商店", index: 0, windowId: 1, active: true }],
+      get: async (id) => ({ id, url: "https://example.com/search?q=keyboard", title: "搜索结果 · 示例商店", index: 0, windowId: 1, active: true }),
       sendMessage: async () => FAKE_SNAPSHOT,
       onActivated: { addListener() {} },
       onUpdated: { addListener() {} },

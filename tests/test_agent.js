@@ -7,6 +7,9 @@ const storage = require("../common/storage.js");
 const historyMod = require("../common/history.js");
 const templatesMod = require("../common/templates.js");
 const suggestMod = require("../common/suggest.js");
+const taskMemoryMod = require("../common/task-memory.js");
+const schedulerMod = require("../common/scheduler.js");
+const errorMsgMod = require("../common/error-msg.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -454,6 +457,46 @@ function assertEq(got, want, name) {
   const ssDef = storage.normalizeSettings({}).sync;
   assertEq(ssDef.enabled, false, "normalizeSettings sync default disabled");
 
+  // ── LLM provider presets (小白免配置) ──
+  assert(storage.PROVIDER_PRESETS.length >= 5, "provider presets ship common options");
+  const pOpenai = storage.findProviderPreset("openai");
+  assert(pOpenai && pOpenai.baseURL === "https://api.openai.com/v1", "openai preset has base URL");
+  const pDeepseek = storage.findProviderPreset("deepseek");
+  assert(pDeepseek && pDeepseek.model === "deepseek-chat", "deepseek preset has model");
+  const pOllama = storage.findProviderPreset("ollama");
+  assert(pOllama && pOllama.local === true, "ollama preset marked local");
+  assert(storage.isLocalProvider("ollama"), "isLocalProvider true for ollama");
+  assert(storage.isLocalProvider("lmstudio"), "isLocalProvider true for lmstudio");
+  assert(!storage.isLocalProvider("openai"), "isLocalProvider false for openai");
+  assert(!storage.isLocalProvider("deepseek"), "isLocalProvider false for deepseek");
+  assert(!storage.isLocalProvider("nonsense"), "isLocalProvider false for unknown provider");
+  assertEq(storage.findProviderPreset("nonsense"), null, "findProviderPreset null for unknown");
+  const resDeepseek = storage.resolveProviderSettings("deepseek", {});
+  assertEq(resDeepseek.provider, "deepseek", "resolveProviderSettings keeps provider id");
+  assertEq(resDeepseek.model, "deepseek-chat", "resolveProviderSettings fills preset model when blank");
+  assertEq(resDeepseek.baseURL, "https://api.deepseek.com/v1", "resolveProviderSettings fills preset baseURL when blank");
+  const resOverride = storage.resolveProviderSettings("ollama", { model: "qwen2.5", baseURL: "http://127.0.0.1:11434/v1" });
+  assertEq(resOverride.model, "qwen2.5", "resolveProviderSettings keeps explicit model override");
+  assertEq(resOverride.baseURL, "http://127.0.0.1:11434/v1", "resolveProviderSettings keeps explicit baseURL override");
+  assertEq(resOverride.provider, "ollama", "resolveProviderSettings keeps local provider id");
+  const resUnknown = storage.resolveProviderSettings("weird", { model: "m", baseURL: "u" });
+  assertEq(resUnknown.provider, "openai", "resolveProviderSettings falls back to openai for unknown id");
+  assertEq(resUnknown.model, "m", "resolveProviderSettings keeps overrides on fallback");
+  const resCustom = storage.resolveProviderSettings("custom", {});
+  assertEq(resCustom.provider, "custom", "custom provider preserved");
+  const resCustomBlank = storage.resolveProviderSettings("custom", { model: "", baseURL: "" });
+  assertEq(resCustomBlank.model, "", "custom provider keeps blank model");
+  assertEq(resCustomBlank.baseURL, "", "custom provider keeps blank baseURL");
+  assert(storage.PROVIDER_PRESETS.some((p) => p.id === "custom"), "presets include a custom option");
+  // onboarding flag normalization
+  assert(storage.normalizeOnboarding(true), "normalizeOnboarding true");
+  assert(storage.normalizeOnboarding(1), "normalizeOnboarding 1");
+  assert(storage.normalizeOnboarding("1"), "normalizeOnboarding '1'");
+  assert(!storage.normalizeOnboarding(false), "normalizeOnboarding false");
+  assert(!storage.normalizeOnboarding(undefined), "normalizeOnboarding undefined");
+  assert(!storage.normalizeOnboarding(null), "normalizeOnboarding null");
+  assert(!storage.normalizeOnboarding(0), "normalizeOnboarding 0");
+
   // ── history ──
   const histStore = {};
   global.chrome = { storage: { local: {
@@ -558,6 +601,33 @@ function assertEq(got, want, name) {
   assert(noFill.includes("{source}"), "applyTemplate leaves unknown placeholders intact");
   assertEq(JSON.stringify(templatesMod.extractPlaceholders(tCross.goal)), JSON.stringify(["source", "item", "target"]), "extractPlaceholders lists unique placeholder keys");
   assertEq(JSON.stringify(templatesMod.extractPlaceholders("无占位符")), JSON.stringify([]), "extractPlaceholders empty for plain text");
+  // New high-frequency built-in templates (share/传播 friendly)
+  assert(templatesMod.findTemplateById("daily-signin"), "templates include daily-signin");
+  assert(templatesMod.findTemplateById("price-watch"), "templates include price-watch");
+  assert(templatesMod.findTemplateById("daily-report"), "templates include daily-report");
+  assert(templatesMod.findTemplateById("course-snatch"), "templates include course-snatch");
+
+  // ── template share round-trip (buildShareTemplate / parseShareTemplate) ──
+  const shareTpl = templatesMod.buildShareTemplate({ label: "抢课", goal: "打开 {site} 选课，抢「{course}」", hint: "秒杀" });
+  assertEq(shareTpl.app, "mio", "share template marks app");
+  assertEq(shareTpl.version, 1, "share template marks version");
+  assertEq(shareTpl.type, "template", "share template marks type");
+  assertEq(JSON.stringify(shareTpl.placeholders), JSON.stringify(["site", "course"]), "share template lists placeholders");
+  assert(shareTpl.goal.includes("{site}"), "share template keeps goal placeholders intact");
+  assert(shareTpl.goal === undefined || !String(shareTpl.goal).match(/token|password|apiKey/i), "share template never carries secrets in goal shape");
+  const reimported = templatesMod.parseShareTemplate(JSON.stringify(shareTpl));
+  assertEq(reimported.goal, shareTpl.goal, "parseShareTemplate round-trips goal from JSON string");
+  assertEq(reimported.label, "抢课", "parseShareTemplate keeps label");
+  assertEq(JSON.stringify(templatesMod.parseShareTemplate(shareTpl)), JSON.stringify({ label: "抢课", goal: shareTpl.goal, hint: "秒杀" }), "parseShareTemplate accepts parsed object");
+  // Invalid payloads are rejected with clear errors.
+  let tplThrew = null;
+  try { templatesMod.parseShareTemplate("not json"); } catch (e) { tplThrew = e.message; }
+  assert(tplThrew, "parseShareTemplate rejects invalid JSON");
+  try { templatesMod.parseShareTemplate({ type: "history", goal: "x" }); } catch (e) { tplThrew = e.message; }
+  assert(tplThrew, "parseShareTemplate rejects wrong type");
+  try { templatesMod.parseShareTemplate({ type: "template" }); } catch (e) { tplThrew = e.message; }
+  assert(tplThrew, "parseShareTemplate rejects missing goal");
+  assertEq(templatesMod.parseShareTemplate({ type: "template", goal: "  签到  " }).goal, "签到", "parseShareTemplate trims goal");
 
   await historyMod.clearHistory();
   delete global.chrome;
@@ -1313,9 +1383,9 @@ function assertEq(got, want, name) {
   // ══ Phase 1: Recovery Engine unit tests ══
   const policy = require("../sidepanel/recovery-policy.js");
   const sorted = policy.getAllowedActions("ELEMENT_NOT_FOUND");
-  assert(sorted[0].action === "retry_snapshot" && sorted[0].priority === 100, "policy sorts ELEMENT_NOT_FOUND by priority desc");
+  assert(sorted[0].action === "wait_and_retry" && sorted[0].priority === 110, "policy sorts ELEMENT_NOT_FOUND by priority desc (wait first for transient renders)");
   assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").some((a) => a.action === "finish"), "policy includes finish as fallback");
-  assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").length === 3, "policy exposes all configured actions");
+  assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").length === 4, "policy exposes all configured actions");
   assert(policy.getAllowedActions("UNKNOWN_CODE").length === 0, "policy returns empty for unknown error code");
   assert(policy.getMaxAttemptsForAction("NO_TOOL_CALLS", "scroll_and_retry") === 1, "policy exposes per-action max attempts");
   assert(policy.getAllowedActions("SCROLL_AT_END").length > 0, "policy covers SCROLL_AT_END");
@@ -1330,7 +1400,7 @@ function assertEq(got, want, name) {
   const rrResult = await reMod.runRecovery(
     { lastError: { code: "ELEMENT_NOT_FOUND" }, recoveryAttempt: 1, maxRecoveryAttempts: 2, recoveryHistory: [] }
   );
-  assert(rrResult.status === "retry" && rrResult.nextTurn === "act" && rrResult.detail.action === "retry_snapshot", "engine picks top-priority action for first attempt");
+  assert(rrResult.status === "retry" && rrResult.nextTurn === "act" && rrResult.detail.action === "wait_and_retry", "engine picks top-priority wait for first ELEMENT_NOT_FOUND attempt");
   const rrExhaust = await reMod.runRecovery(
     { lastError: { code: "ELEMENT_NOT_FOUND" }, recoveryAttempt: 2, maxRecoveryAttempts: 2, recoveryHistory: ["retry_snapshot"] }
   );
@@ -1340,9 +1410,9 @@ function assertEq(got, want, name) {
   );
   assert(rrNoAllowed.status === "finish", "engine finishes when no allowed actions");
   const rrDup = await reMod.runRecovery(
-    { lastError: { code: "ELEMENT_NOT_FOUND" }, recoveryAttempt: 1, maxRecoveryAttempts: 2, recoveryHistory: ["wait_and_retry", "retry_snapshot"] }
+    { lastError: { code: "ELEMENT_NOT_FOUND" }, recoveryAttempt: 1, maxRecoveryAttempts: 2, recoveryHistory: ["wait_and_retry"] }
   );
-  assert(rrDup.status === "retry" && rrDup.detail.action === "scroll_and_retry", "engine falls back to next priority to avoid consecutive duplicate");
+  assert(rrDup.status === "retry" && rrDup.detail.action === "retry_snapshot", "engine falls back to next priority to avoid consecutive duplicate");
 
   const resMod = require("../sidepanel/recovery-result.js");
   const rrFromAction = resMod.createRecoveryResultFromAction("scroll_and_retry");
@@ -1381,6 +1451,60 @@ function assertEq(got, want, name) {
   const rctx = rxMod.createRecoveryContext("t", "s", 1, 2, null, { code: "ELEMENT_NOT_FOUND", message: "m" }, [], { elementCount: 0, url: "", title: "" }, { vision: false });
   assert(rctx.capabilities && rctx.capabilities.vision === false && rctx.capabilities.planner === false && rctx.capabilities.ocr === false, "recovery context carries reserved capabilities");
 
+  // ══ 失败提示人话化（common/error-msg.js）══
+  assert(errorMsgMod.ERROR_MESSAGES.ELEMENT_NOT_FOUND && errorMsgMod.ERROR_MESSAGES.ELEMENT_NOT_FOUND.human, "ELEMENT_NOT_FOUND has a human message");
+  assert(!/ELEMENT_NOT_FOUND/.test(errorMsgMod.errorToHuman("ELEMENT_NOT_FOUND").human), "human message hides the raw error code");
+  const humanized = errorMsgMod.humanizeError("ELEMENT_NOT_FOUND", "no element at index 99");
+  assert(humanized.includes("没找到") && !humanized.includes("ELEMENT_NOT_FOUND"), "humanizeError turns code+message into Chinese");
+  assert(errorMsgMod.humanizeError("ELEMENT_NOT_FOUND", "").includes("没找到"), "humanizeError works without a raw message");
+  assert(errorMsgMod.humanizeError("UNKNOWN_CODE", "m").includes("出了问题"), "humanizeError falls back for unknown codes");
+  assert(errorMsgMod.humanizeError("RECOVERY_EXHAUSTED", "").includes("没成功"), "humanizeError covers RECOVERY_EXHAUSTED");
+  assert(errorMsgMod.humanizeErrorFull("FIELD_NOT_FOUND", "missing: 用户名").includes("表单字段"), "humanizeErrorFull includes advice + detail");
+  // recovery events → human narrative
+  const humanNarr = errorMsgMod.humanizeRecoveryEvents([
+    { kind: "error", code: "ELEMENT_NOT_FOUND", message: "no element" },
+    { kind: "attempt", action: "retry_snapshot", ok: true, reason: "重新获取页面快照" },
+    { kind: "outcome", outcome: "recovered" },
+  ]);
+  assert(humanNarr.includes("没找到") && humanNarr.includes("换了个方式"), "humanizeRecoveryEvents tells a readable recovery story");
+  assert(humanNarr.includes("重新看了一遍页面"), "attemptLabel maps retry_snapshot to Chinese");
+  assertEq(errorMsgMod.humanizeRecoveryEvents([]), "", "humanizeRecoveryEvents empty input");
+  assert(errorMsgMod.attemptLabel("vision_locate").includes("视觉"), "attemptLabel maps vision_locate to Chinese");
+
+  // ══ 失败分析（sidepanel/failure-stats.js）══
+  const failureStatsMod = require("../sidepanel/failure-stats.js");
+  const recA = { status: "done", stepEvents: [
+    { type: "recovery", kind: "error", code: "ELEMENT_NOT_FOUND" },
+    { type: "recovery", kind: "attempt", action: "retry_snapshot", ok: true },
+  ] };
+  const recB = { status: "error", stepEvents: [
+    { type: "recovery", kind: "error", code: "FIELD_NOT_FOUND" },
+    { type: "recovery", kind: "error", code: "ELEMENT_NOT_FOUND" },
+    { type: "recovery", kind: "outcome", outcome: "exhausted" },
+  ] };
+  const recC = { status: "done", stepEvents: [] };
+  assertEq(JSON.stringify(failureStatsMod.extractErrorCodes(recA)), JSON.stringify(["ELEMENT_NOT_FOUND"]), "extractErrorCodes dedupes per record");
+  assertEq(failureStatsMod.extractErrorCodes(recB).length, 2, "extractErrorCodes collects all codes in a record");
+  const agg = failureStatsMod.aggregateErrors([recA, recB, recC]);
+  assertEq(agg.ELEMENT_NOT_FOUND, 2, "aggregateErrors counts across records");
+  assertEq(agg.FIELD_NOT_FOUND, 1, "aggregateErrors counts distinct codes");
+  const top = failureStatsMod.topErrors([recA, recB, recC], 2);
+  assertEq(top[0].code, "ELEMENT_NOT_FOUND", "topErrors ranks the most frequent first");
+  assertEq(top.length, 2, "topErrors respects n");
+  assert(failureStatsMod.isFailed(recB), "isFailed true when status error");
+  assert(!failureStatsMod.isFailed(recA), "isFailed false for recovered task");
+  assert(failureStatsMod.isFailed({ status: "done", stepEvents: [{ type: "step_failed", stepIndex: 0 }] }), "isFailed detects step_failed");
+  const sr = failureStatsMod.successRate([recA, recB, recC]);
+  assertEq(sr.total, 3, "successRate counts total");
+  assertEq(sr.failed, 1, "successRate counts failed");
+  assert(Math.abs(sr.successRate - 2 / 3) < 1e-9, "successRate computes ratio");
+  assertEq(failureStatsMod.successRate([]).successRate, 0, "successRate empty list");
+
+  // ELEMENT_NOT_FOUND 策略前置 wait_and_retry（页面瞬态未渲染是 top1 失败）
+  const enf = policy.getAllowedActions("ELEMENT_NOT_FOUND");
+  assert(enf[0].action === "wait_and_retry", "ELEMENT_NOT_FOUND first recovery is wait (transient page render)");
+  assert(enf.some((a) => a.action === "retry_snapshot"), "ELEMENT_NOT_FOUND still retries snapshot after wait");
+
   // ══ Phase 2: recovery actions wired through executor ══
   // retry_snapshot: transient element-not-found on first turn → recovery retries → success on next turn
   const recLlm = mockLlm([
@@ -1401,7 +1525,7 @@ function assertEq(got, want, name) {
   assert(recRes.ok, "retry_snapshot recovery lets a transient missing-element step succeed");
   assert(recRes.summary === "done", "retry_snapshot recovery reaches finish on the follow-up turn");
   assert(recEvents.some((e) => e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "recovery emits error event with code");
-  assert(recEvents.some((e) => e.kind === "attempt" && e.action === "retry_snapshot"), "recovery emits retry_snapshot attempt event");
+  assert(recEvents.some((e) => e.kind === "attempt" && e.action === "wait_and_retry"), "recovery emits wait_and_retry attempt event (new top action for transient misses)");
 
   // ── onStepEvent: step events streamed in real time during execution ──
   const streamLlm = mockLlm([
@@ -1422,7 +1546,7 @@ function assertEq(got, want, name) {
   assert(streamRes.ok, "onStepEvent run completes");
   assert(streamEvents.some((e) => e.type === "step_start" && e.stepIndex === 0), "onStepEvent streams step_start live");
   assert(streamEvents.some((e) => e.type === "recovery" && e.kind === "error" && e.code === "ELEMENT_NOT_FOUND"), "onStepEvent streams recovery error live");
-  assert(streamEvents.some((e) => e.type === "recovery" && e.kind === "attempt" && e.action === "retry_snapshot"), "onStepEvent streams recovery attempt live");
+  assert(streamEvents.some((e) => e.type === "recovery" && e.kind === "attempt" && e.action === "wait_and_retry"), "onStepEvent streams recovery attempt live");
   assert(streamEvents.some((e) => e.type === "step_done" && e.stepIndex === 0), "onStepEvent streams step_done live");
   assertEq(JSON.stringify(streamRes.events), JSON.stringify(streamEvents), "returned events equal the live stream");
 
@@ -1437,7 +1561,7 @@ function assertEq(got, want, name) {
   assertEq(evs.attempts.length, 2, "events records all attempts");
   assertEq(evs.outcome, "exhausted", "events records final outcome");
   const rendered = revMod.renderEventStream(evs);
-  assert(rendered.includes("[步骤 4] ❌ ELEMENT_NOT_FOUND"), "render shows 1-based step + error");
+  assert(rendered.includes("[步骤 4] ❌ 没找到"), "render shows 1-based step + humanized error");
   assert(rendered.includes("✓ retry_snapshot"), "render marks successful attempt");
   assert(rendered.includes("✗ scroll_and_retry"), "render marks failed attempt");
   assert(rendered.includes("恢复用尽"), "render shows exhausted outcome");
@@ -1454,7 +1578,7 @@ function assertEq(got, want, name) {
     { type: "recovery", stepIndex: 0, kind: "outcome", outcome: "exhausted" },
   ];
   const narrative = revMod.renderStepFailure(stepRecovery);
-  assert(narrative.includes("ELEMENT_NOT_FOUND"), "renderStepFailure shows error code");
+  assert(narrative.includes("没找到"), "renderStepFailure shows humanized error");
   assert(narrative.includes("retry_snapshot") && narrative.includes("✓"), "renderStepFailure shows success attempt");
   assert(narrative.includes("vision_locate") && narrative.includes("✗"), "renderStepFailure shows failed attempt");
   assert(narrative.includes("恢复用尽"), "renderStepFailure shows exhausted outcome");
@@ -1501,6 +1625,7 @@ function assertEq(got, want, name) {
   const bridgeChrome = {
     tabs: {
       query: async () => [{ id: 1, url: "https://host.example/page" }],
+      get: async (id) => ({ id, url: "https://host.example/page" }),
       sendMessage: async (tabId, msg, opts) => {
         sent.push({ frameId: opts && opts.frameId, msg });
         const fid = (opts && opts.frameId) || 0;
@@ -1544,6 +1669,7 @@ function assertEq(got, want, name) {
         { id: 1, index: 0, title: "首页", url: "https://a.example", active: false, windowId: 7 },
         { id: 2, index: 1, title: "京东", url: "https://jd.example", active: true, windowId: 7 },
       ],
+      get: async (id) => ({ id, index: id === 2 ? 1 : 0, title: id === 2 ? "京东" : "首页", url: id === 2 ? "https://jd.example" : "https://a.example", active: id === 2, windowId: 7 }),
       sendMessage: async () => ({ type: protocol.MSG.SNAPSHOT_RESPONSE, payload: { snapshot: { title: "京东", url: "https://jd.example", elements: [{ role: "button", name: "加购", index: 0, framePath: [] }] } } }),
     },
     scripting: { executeScript: async () => {} },
@@ -1988,11 +2114,12 @@ function assertEq(got, want, name) {
   // executor runs vision_locate as last resort when enabled: DOM retries exhaust, then vision
   const visionEvents = [];
   const visionLlm = mockLlm([
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover scroll_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover vision_locate
-    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }), // turn5 → succeed
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover scroll_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover vision_locate
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }), // turn6 → succeed
   ]);
   const visionBridge = {
     snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),
@@ -2061,12 +2188,13 @@ function assertEq(got, want, name) {
   // ── vision recovery with coordinates hands the agent a click_at hint ──
   const coordEvents = [];
   const coordLlm = mockLlm([
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover scroll_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover vision_locate (has coords)
-    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 512, y: 360 })] }), // turn5 → agent clicks at coords
-    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了" })] }), // turn6 → done
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover scroll_and_retry
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover retry_snapshot
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover vision_locate (has coords)
+    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 512, y: 360 })] }), // turn6 → agent clicks at coords
+    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了" })] }), // turn7 → done
   ]);
   const coordVisionLlm = { generate: async (msgs, opts) => ({ content: "目标可见。x:512, y:360" }) };
   const coordBridge = {
@@ -2564,6 +2692,152 @@ function assertEq(got, want, name) {
 
   // Password detection falls back to name/placeholder hints (no inputType).
   assert(suggestMod.findLoginFields([mkEl({ role: "textbox", name: "用户名" }), mkEl({ role: "textbox", name: "密码" })]), "password hint detected by name");
+
+  // ── task memory (common/task-memory.js) ──
+  assertEq(taskMemoryMod.extractDomain("https://www.example.com/path?a=1"), "www.example.com", "extractDomain parses hostname");
+  assertEq(taskMemoryMod.extractDomain("http://localhost:8080/x"), "localhost", "extractDomain keeps portless host");
+  assertEq(taskMemoryMod.extractDomain(""), "", "extractDomain empty input");
+  assertEq(taskMemoryMod.extractDomain("not a url"), "not", "extractDomain falls back to regex for odd input");
+  const mem0 = taskMemoryMod.recordGoalInMemory({}, "a.com", "  搜索并打开第一条结果  ");
+  assert(mem0["a.com"] && mem0["a.com"].length === 1, "recordGoalInMemory adds first goal");
+  assertEq(mem0["a.com"][0].goal, "搜索并打开第一条结果", "recordGoalInMemory trims goal");
+  assertEq(mem0["a.com"][0].count, 1, "recordGoalInMemory starts count at 1");
+  const mem1 = taskMemoryMod.recordGoalInMemory(mem0, "a.com", "搜索并打开第一条结果");
+  assertEq(mem1["a.com"][0].count, 2, "recordGoalInMemory increments repeated goal");
+  assertEq(mem1["a.com"].length, 1, "recordGoalInMemory dedupes repeated goal");
+  const mem2 = taskMemoryMod.recordGoalInMemory(mem1, "a.com", "比价");
+  assertEq(mem2["a.com"].length, 2, "recordGoalInMemory keeps distinct goals");
+  assertEq(mem2["a.com"][0].goal, "搜索并打开第一条结果", "recordGoalInMemory sorts by count desc");
+  const mem3 = taskMemoryMod.recordGoalInMemory(mem2, "b.com", "跨站搬运");
+  assert(mem3["b.com"] && mem3["b.com"].length === 1, "recordGoalInMemory stores second domain");
+  assert(mem2["b.com"] === undefined, "recordGoalInMemory is immutable to the caller");
+  // Per-domain cap: only the most-frequent 20 goals survive.
+  let memCap = {};
+  for (let i = 0; i < 25; i++) memCap = taskMemoryMod.recordGoalInMemory(memCap, "c.com", "任务" + i);
+  assertEq(memCap["c.com"].length, taskMemoryMod.MAX_PER_DOMAIN, "per-domain cap at MAX_PER_DOMAIN");
+  // Global cap: total entries bounded by MAX_TOTAL.
+  let memTot = {};
+  for (let d = 0; d < 12; d++) {
+    for (let i = 0; i < 25; i++) memTot = taskMemoryMod.recordGoalInMemory(memTot, "d" + d + ".com", "g" + i);
+  }
+  let total = 0;
+  for (const d of Object.keys(memTot)) total += memTot[d].length;
+  assert(total <= taskMemoryMod.MAX_TOTAL, "global memory bounded by MAX_TOTAL");
+  // getDomainGoals returns sorted copy without mutating.
+  const goals = taskMemoryMod.getDomainGoals(mem3, "a.com");
+  assertEq(goals[0].goal, "搜索并打开第一条结果", "getDomainGoals returns count-desc order");
+  const goals2 = taskMemoryMod.getDomainGoals(mem3, "a.com");
+  assertEq(goals2[0].goal, goals[0].goal, "getDomainGoals is repeatable");
+  assertEq(taskMemoryMod.getDomainGoals(mem3, "nope.com").length, 0, "getDomainGoals empty for unknown domain");
+  // normalizeMemory coerces junk payloads.
+  const normMem = taskMemoryMod.normalizeMemory({ "a.com": [{ goal: "x", count: "3", lastAt: 1 }, { goal: "" }, null, "junk"] });
+  assertEq(normMem["a.com"].length, 1, "normalizeMemory drops empty/invalid entries");
+  assertEq(normMem["a.com"][0].count, 3, "normalizeMemory coerces count");
+  assertEq(taskMemoryMod.normalizeMemory(null)["a.com"], undefined, "normalizeMemory handles null");
+  assertEq(taskMemoryMod.normalizeMemory({ "a.com": "nope" })["a.com"], undefined, "normalizeMemory drops non-array domain");
+  // mergeSuggestions pins memory on top, dedupes by goal, respects limit.
+  const heur = suggestMod.suggestTasks(mkSnap("首页", [
+    mkEl({ role: "textbox", name: "搜索" }),
+    mkEl({ role: "button", name: "搜索" }),
+  ]));
+  const merged = taskMemoryMod.mergeSuggestions(
+    [{ goal: "搜索并打开第一条结果", count: 3 }, { goal: "比价", count: 1 }],
+    heur,
+    6
+  );
+  assertEq(merged[0].goal, "搜索并打开第一条结果", "mergeSuggestions pins memory first");
+  assert(merged[0].frequent, "mergeSuggestions marks memory entry as frequent");
+  assertEq(merged[0].id, "memory", "mergeSuggestions ids memory entries");
+  assert(merged.length >= 4 && merged.length <= 6, "mergeSuggestions never exceeds limit");
+  assertEq(merged.filter((t) => t.goal === "搜索并打开第一条结果").length, 1, "mergeSuggestions dedupes overlapping goals");
+  const limited = taskMemoryMod.mergeSuggestions(
+    [{ goal: "g1", count: 1 }, { goal: "g2", count: 1 }, { goal: "g3", count: 1 }],
+    heur,
+    2
+  );
+  assertEq(limited.length, 2, "mergeSuggestions honors a smaller limit");
+  // recordGoal / getMemory use chrome.storage.local (mocked below).
+  const memStore = {};
+  global.chrome = { storage: { local: {
+    get: async (key) => ({ [key]: memStore[key] }),
+    set: async (obj) => { Object.assign(memStore, obj); },
+    remove: async (key) => { delete memStore[key]; },
+  } } };
+  await taskMemoryMod.recordGoal("a.com", "搜索并打开第一条结果");
+  await taskMemoryMod.recordGoal("a.com", "搜索并打开第一条结果");
+  await taskMemoryMod.recordGoal("a.com", "比价");
+  const fromStorage = await taskMemoryMod.getMemory();
+  assert(fromStorage["a.com"] && fromStorage["a.com"][0].goal === "搜索并打开第一条结果", "recordGoal persists via chrome.storage.local");
+  assertEq(fromStorage["a.com"][0].count, 2, "recordGoal increments count across calls");
+  assert(!JSON.stringify(memStore).includes("sync"), "task memory never touches cloud keys");
+  const mergedDomains = Object.keys(fromStorage);
+  assertEq(JSON.stringify(mergedDomains), JSON.stringify(["a.com"]), "getMemory only returns recorded domains");
+  delete global.chrome;
+
+  // ── scheduled tasks (common/scheduler.js) ──
+  assertEq(schedulerMod.parseTime("09:30"), 570, "parseTime converts HH:MM to minutes");
+  assertEq(schedulerMod.parseTime("00:00"), 0, "parseTime handles midnight");
+  assertEq(schedulerMod.parseTime("bad"), null, "parseTime rejects invalid time");
+  assertEq(schedulerMod.parseTime("24:00"), null, "parseTime rejects out-of-range hour");
+  assertEq(schedulerMod.formatTime(570), "09:30", "formatTime round-trips");
+  assert(schedulerMod.normalizeSchedule({}).frequency === "daily", "normalizeSchedule defaults frequency daily");
+  assert(schedulerMod.normalizeSchedule({ intervalMinutes: 0 }).intervalMinutes >= schedulerMod.MIN_INTERVAL_MIN, "normalizeSchedule clamps interval to MIN_INTERVAL_MIN");
+  assertEq(schedulerMod.normalizeSchedule({ intervalMinutes: "15" }).intervalMinutes, 15, "normalizeSchedule coerces intervalMinutes");
+  assert(schedulerMod.normalizeSchedule({}).enabled === false, "normalizeSchedule defaults disabled");
+  const schedDaily = schedulerMod.normalizeSchedule({ goal: "签到", frequency: "daily", time: "09:00", enabled: true });
+  const now = Date.parse("2026-08-15T08:00:00+08:00");
+  const nextDaily = schedulerMod.computeNextRunAt(schedDaily, now);
+  assert(nextDaily > now, "daily next run is in the future");
+  assert(nextDaily - now < 2 * 86400000, "daily next run within one day");
+  const atTime = schedulerMod.computeNextRunAt(schedDaily, Date.parse("2026-08-15T10:00:00+08:00"));
+  assert(atTime > Date.parse("2026-08-15T10:00:00+08:00") && atTime < Date.parse("2026-08-16T10:00:00+08:00"), "daily next run rolls to tomorrow after time passed");
+  const schedWeekly = schedulerMod.normalizeSchedule({ goal: "日报", frequency: "weekly", weekday: 1, time: "09:00", enabled: true });
+  const nextWeekly = schedulerMod.computeNextRunAt(schedWeekly, Date.parse("2026-08-14T08:00:00+08:00"));
+  assert(nextWeekly > Date.parse("2026-08-14T08:00:00+08:00"), "weekly next run is in the future");
+  const wd = new Date(nextWeekly).getDay();
+  assertEq(wd, 1, "weekly next run lands on Monday");
+  const schedInterval = schedulerMod.normalizeSchedule({ goal: "监控", frequency: "interval", intervalMinutes: 30, enabled: true });
+  assertEq(schedulerMod.computeNextRunAt(schedInterval, 1000000) - 1000000, 30 * 60000, "interval next run = now + interval");
+  // Disabled / empty goals have no next run.
+  assertEq(schedulerMod.computeNextRunAt({ ...schedDaily, enabled: false }, now), 0, "disabled schedule has no next run");
+  assertEq(schedulerMod.computeNextRunAt({ ...schedDaily, goal: "" }, now), 0, "empty goal schedule has no next run");
+  assertEq(schedulerMod.computeNextRunAt({ ...schedDaily, time: "oops" }, now), 0, "bad time schedule has no next run");
+  // scheduleToAlarmInfo maps to chrome.alarms specs.
+  const alarmInfo = schedulerMod.scheduleToAlarmInfo(schedDaily, now);
+  assert(alarmInfo.when > now, "daily alarm spec has future when");
+  assertEq(alarmInfo.periodInMinutes, 1440, "daily alarm spec repeats daily");
+  const nearNow = now + 5000; // next fire within MIN_ALARM_DELAY_MS
+  const nudge = schedulerMod.scheduleToAlarmInfo({ ...schedDaily, time: "00:00" }, now);
+  if (nudge) assert(nudge.when - now >= schedulerMod.MIN_ALARM_DELAY_MS, "alarm spec nudges fireAt at least MIN_ALARM_DELAY_MS ahead");
+  const intervalInfo = schedulerMod.scheduleToAlarmInfo(schedInterval, now);
+  assertEq(intervalInfo.periodInMinutes, 30, "interval alarm spec uses periodInMinutes");
+  assert(intervalInfo.when === undefined, "interval alarm spec has no when");
+  assert(schedulerMod.describeSchedule(schedDaily, now).includes("每日"), "describeSchedule includes daily label");
+  assert(schedulerMod.describeSchedule({ ...schedDaily, enabled: false }, now).includes("停用"), "describeSchedule notes disabled");
+  assert(schedulerMod.alarmName("abc") === schedulerMod.ALARM_PREFIX + "abc", "alarmName prefixes with ALARM_PREFIX");
+
+  // storage-backed CRUD against a mocked chrome.storage.local
+  const schedStore = {};
+  global.chrome = { storage: { local: {
+    get: async (key) => ({ [key]: schedStore[key] }),
+    set: async (obj) => { Object.assign(schedStore, obj); },
+    remove: async (key) => { delete schedStore[key]; },
+  } } };
+  const saved = await schedulerMod.saveSchedule({ goal: "每日签到", frequency: "daily", time: "08:30", enabled: true });
+  assert(saved.id, "saveSchedule assigns an id");
+  const saved2 = await schedulerMod.saveSchedule({ goal: "每周日报", frequency: "weekly", weekday: 5, time: "18:00", enabled: true });
+  const list = await schedulerMod.getSchedules();
+  assertEq(list.length, 2, "getSchedules returns saved schedules");
+  assertEq(list[0].goal, "每日签到", "getSchedules normalizes saved entries");
+  const toggled = await schedulerMod.toggleSchedule(saved.id, false);
+  assert(toggled.enabled === false, "toggleSchedule disables a schedule");
+  const schedRes = await schedulerMod.setScheduleResult(saved.id, { status: "done", summary: "ok" });
+  assertEq(schedRes.lastStatus, "done", "setScheduleResult records status");
+  assert(schedRes.lastRunAt > 0, "setScheduleResult records lastRunAt");
+  const afterDel = await schedulerMod.deleteSchedule(saved2.id);
+  assertEq(afterDel.length, 1, "deleteSchedule removes a schedule");
+  assertEq((await schedulerMod.getSchedules())[0].id, saved.id, "remaining schedule intact");
+  delete global.chrome;
 
   // ── planner stage splitting (P0: 长任务阶段拆分) ──
   const stagedGoal = [

@@ -267,6 +267,17 @@
     .suggest-task .icon { flex: none; font-size: 13px; }
     .suggest-task .label { font-size: 12px; color: var(--text); font-weight: 600; }
     .suggest-task .hint { font-size: 10px; color: var(--overlay); margin-top: 1px; }
+    .suggest-task .badge {
+      display: inline-block;
+      margin-left: 6px;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--mauve);
+      border: 1px solid var(--mauve);
+      border-radius: 999px;
+      padding: 0 5px;
+      vertical-align: 1px;
+    }
     .suggest-empty { font-size: 11px; color: var(--overlay); padding: 4px 2px; }
     .template-chip {
       font-size: 11px;
@@ -286,6 +297,44 @@
     }
     .template-chip.custom:hover {
       background: rgba(249,226,175,.12);
+    }
+    .template-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .template-wrap .template-chip {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+    .template-share {
+      padding: 3px 6px;
+      font-size: 10px;
+      border-radius: 0 999px 999px 0;
+      background: transparent;
+      color: var(--lavender);
+      border-color: rgba(180,190,254,.35);
+      cursor: pointer;
+    }
+    .template-share:hover { background: rgba(180,190,254,.12); }
+    .template-import {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: transparent;
+      color: var(--pink);
+      border-color: rgba(245,194,231,.35);
+      cursor: pointer;
+    }
+    .template-import:hover { background: rgba(245,194,231,.12); }
+    .history-share-template {
+      flex: none;
+      padding: 3px 9px;
+      font-size: 11px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--pink);
+      border-color: rgba(245,194,231,.35);
     }
     #goal {
       width: 100%;
@@ -368,6 +417,20 @@
       outline: none;
     }
     input:focus { border-color: var(--mauve); box-shadow: 0 0 0 2px rgba(203,166,247,.15); }
+    select {
+      width: 100%;
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+    }
+    select:focus { border-color: var(--mauve); box-shadow: 0 0 0 2px rgba(203,166,247,.15); }
+    #testConnection { background: transparent; color: var(--teal); border-color: rgba(148,226,213,.35); }
+    #testConnection:disabled { opacity: .5; cursor: wait; }
     .settings-body .full { grid-column: 1 / -1; }
     .settings-body .vis-head { margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(203,166,247,.25); color: var(--subtext); font-size: 12px; }
     #saveSettings {
@@ -517,6 +580,19 @@
     .history-actions { display: flex; gap: 6px; }
     .history-actions button { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
     #historyClear { background: transparent; color: var(--red); border-color: rgba(243,139,168,.35); }
+    #historyStats { background: transparent; color: var(--pink); border-color: rgba(245,194,231,.35); }
+    .stats-banner {
+      margin: 8px 12px;
+      padding: 9px 11px;
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: 10px;
+      font-size: 11px;
+      color: var(--subtext);
+      line-height: 1.6;
+    }
+    .stats-banner .stats-title { font-weight: 700; color: var(--pink); margin-bottom: 4px; }
+    .stats-banner b { color: var(--text); }
     #historyClose { background: transparent; color: var(--overlay); }
     .history-list {
       flex: 1;
@@ -698,6 +774,155 @@
       padding: 6px 0;
     }
 
+    /* scheduled tasks view */
+    .sched-toggle {
+      background: transparent;
+      color: var(--pink);
+      border-color: rgba(245,194,231,.35);
+    }
+    .sched-view {
+      display: none;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .sched-view.open { display: flex; }
+    .sched-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--mauve);
+      border-bottom: 1px solid var(--surface);
+    }
+    .sched-head .sched-sub { font-size: 10px; font-weight: 400; color: var(--overlay); }
+    #schedClose { padding: 4px 10px; font-size: 11px; background: transparent; color: var(--overlay); }
+    .sched-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--surface);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .sched-form .full { grid-column: 1 / -1; }
+    .sched-form-row { display: flex; flex-direction: column; gap: 3px; }
+    .sched-form-row textarea {
+      width: 100%;
+      min-height: 46px;
+      resize: none;
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+    }
+    .sched-form-row select {
+      background: var(--crust);
+      border: 1px solid var(--surface);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      outline: none;
+    }
+    .sched-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+    .sched-actions button { padding: 7px 12px; font-size: 12px; }
+    #schedAdd { background: var(--mauve); color: #1e1e2e; border: none; font-weight: 600; }
+    #schedAddFromCompose { background: transparent; color: var(--lavender); border-color: rgba(180,190,254,.35); }
+    .sched-list { max-height: 260px; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .sched-empty { color: var(--overlay); text-align: center; padding: 14px 0; font-size: 12px; }
+    .sched-item { background: var(--crust); border: 1px solid var(--surface); border-radius: 10px; padding: 9px 11px; }
+    .sched-item.disabled { opacity: .6; }
+    .sched-item-goal { font-size: 12px; color: var(--text); word-break: break-all; }
+    .sched-item-meta { font-size: 10.5px; color: var(--overlay); margin-top: 3px; word-break: break-word; }
+    .sched-item-meta .ok { color: var(--green); }
+    .sched-item-meta .err { color: var(--red); }
+    .sched-item-actions { display: flex; gap: 6px; margin-top: 7px; }
+    .sched-item-actions button { padding: 3px 9px; font-size: 11px; border-radius: 8px; }
+    .sched-run-now { background: transparent; color: var(--teal); border-color: rgba(148,226,213,.35); }
+    .sched-toggle-btn { background: transparent; color: var(--yellow, #f9e2af); border-color: rgba(249,226,175,.4); }
+    .sched-del { background: transparent; color: var(--red); border-color: rgba(243,139,168,.35); }
+
+    /* onboarding */
+    .onboard-mask {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(17,17,27,.86);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .onboard-card {
+      width: 100%;
+      max-width: 340px;
+      background: var(--mantle);
+      border: 1px solid var(--surface);
+      border-radius: 16px;
+      padding: 18px 16px 14px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+      animation: onboard-pop .25s ease;
+    }
+    @keyframes onboard-pop { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+    .onboard-steps { display: flex; flex-direction: column; gap: 6px; }
+    .onboard-step {
+      display: flex;
+      gap: 12px;
+      padding: 10px 8px;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      transition: all .2s;
+    }
+    .onboard-step.active {
+      border-color: rgba(203,166,247,.4);
+      background: rgba(203,166,247,.07);
+    }
+    .onboard-num {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      background: var(--surface);
+      color: var(--overlay);
+      border: 1px solid var(--surface);
+    }
+    .onboard-step.active .onboard-num {
+      background: linear-gradient(120deg, var(--mauve), var(--lavender));
+      color: #1e1e2e;
+      border-color: transparent;
+    }
+    .onboard-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .onboard-text { font-size: 11.5px; color: var(--subtext); margin-top: 3px; line-height: 1.5; }
+    .onboard-step:not(.active) .onboard-text { color: var(--overlay); }
+    .onboard-dots { display: flex; gap: 6px; justify-content: center; margin: 10px 0 6px; }
+    .onboard-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface); transition: all .2s; }
+    .onboard-dot.active { background: var(--mauve); width: 18px; border-radius: 999px; }
+    .onboard-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .onboard-actions button { flex: 1; padding: 9px 12px; font-size: 12px; border-radius: 10px; }
+    .onboard-skip { background: transparent; color: var(--overlay); border-color: var(--surface); }
+    .onboard-next { background: linear-gradient(120deg, var(--mauve), var(--lavender)); color: #1e1e2e; font-weight: 700; border: none; }
+    .onboard-never { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11px; color: var(--overlay); cursor: pointer; }
+    .onboard-never input { width: auto; }
+
     footer {
       position: relative;
       z-index: 1;
@@ -764,18 +989,72 @@
         <button id="start">开始任务</button>
         <button id="stop">停止</button>
         <button id="historyToggle" title="查看历史任务记录">历史</button>
+        <button id="schedToggle" title="配置定时/周期任务" class="sched-toggle">⏰ 定时</button>
       </div>
     </section>
+
+    <div class="sched-view" id="schedView" hidden>
+      <div class="sched-head">
+        <span>定时任务 <span class="sched-sub">浏览器打开时到点自动跑，无需手动开</span></span>
+        <button id="schedClose" title="关闭">关闭</button>
+      </div>
+      <div class="sched-form">
+        <div class="sched-form-row full"><label>任务目标</label><textarea id="schedGoal" placeholder="例如：打开 XX 网签到，确认签到成功并记录结果"></textarea></div>
+        <div class="sched-form-row full"><label>目标网址（可选，填了会打开/复用到该站点）</label><input id="schedUrl" type="text" placeholder="https://example.com"></div>
+        <div class="sched-form-row">
+          <label>周期</label>
+          <select id="schedFrequency">
+            <option value="daily">每日</option>
+            <option value="weekly">每周</option>
+            <option value="interval">间隔</option>
+          </select>
+        </div>
+        <div class="sched-form-row">
+          <label>时间 (每日/每周)</label>
+          <input id="schedTime" type="time" value="09:00">
+        </div>
+        <div class="sched-form-row" id="schedWeekdayRow" hidden>
+          <label>星期</label>
+          <select id="schedWeekday">
+            <option value="0">周日</option><option value="1" selected>周一</option>
+            <option value="2">周二</option><option value="3">周三</option>
+            <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+          </select>
+        </div>
+        <div class="sched-form-row" id="schedIntervalRow" hidden>
+          <label>间隔（分钟）</label>
+          <input id="schedInterval" type="number" min="1" value="60">
+        </div>
+        <div class="sched-form-row full"><label>当前任务（可点击补全）</label><input id="schedGoalFromCompose" type="text" placeholder="使用下方输入框的目标…" readonly></div>
+        <div class="sched-actions">
+          <button id="schedAdd">添加定时任务</button>
+          <button id="schedAddFromCompose">用当前目标添加</button>
+        </div>
+      </div>
+      <div class="sched-list" id="schedList"></div>
+    </div>
 
     <details class="settings">
       <summary>设置</summary>
       <div class="settings-body">
-        <div><label>Provider</label><input id="provider" placeholder="openai"></div>
+        <div><label>Provider</label><select id="provider">
+          <option value="openai">OpenAI</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="zhipu">智谱 GLM</option>
+          <option value="moonshot">月之暗面 Kimi</option>
+          <option value="ollama">Ollama（本地）</option>
+          <option value="lmstudio">LM Studio（本地）</option>
+          <option value="custom">自定义</option>
+        </select></div>
         <div><label>Model</label><input id="model" placeholder="gpt-4o-mini"></div>
         <div class="full"><label>Base URL</label><input id="baseUrl" placeholder="https://api.openai.com/v1"></div>
-        <div class="full"><label>API Key</label><input id="apiKey" type="password"></div>
+        <div class="full"><label>API Key <span style="font-weight:400;color:var(--overlay)">（本地模型可留空）</span></label><input id="apiKey" type="password" placeholder="sk-... 或本地模型留空"></div>
         <div><label>Max Steps</label><input id="maxSteps" type="number" value="30"></div>
         <div><label><input id="enableVision" type="checkbox" style="width:auto; vertical-align:middle"> Vision 兜底</label></div>
+        <div class="full" style="display:flex; gap:8px">
+          <button id="testConnection" style="flex:1">测试连接</button>
+          <span id="testConnectionStatus" style="align-self:center; font-size:11px; color:var(--overlay)"></span>
+        </div>
         <div class="full vis-head">视觉模型（独立配置，留空则复用上方模型）</div>
         <div><label>Vision Model</label><input id="visionModel" placeholder="glm-4v-flash"></div>
         <div><label>Vision Base URL</label><input id="visionBaseUrl" placeholder="https://open.bigmodel.cn/api/paas/v4"></div>
@@ -804,6 +1083,7 @@
       <div class="history-head">
         <span>任务历史</span>
         <div class="history-actions">
+          <button id="historyStats" title="失败分析：看看最近哪些环节最容易失败">失败分析</button>
           <button id="historyExport" title="导出 JSON">导出</button>
           <button id="historyImport" title="从 JSON 导入">导入</button>
           <button id="historyClear">清空</button>
@@ -826,14 +1106,52 @@
 
   <footer>mio <span id="version"></span> · 幽灵一般的浏览器助手</footer>
 
+  <!-- 首次使用引导（onboarding）遮罩：纯 sidepanel 改动，不引入新权限 -->
+  <div class="onboard-mask" id="onboardMask" hidden>
+    <div class="onboard-card">
+      <div class="onboard-steps">
+        <div class="onboard-step" data-step="0">
+          <div class="onboard-num">1</div>
+          <div class="onboard-body">
+            <div class="onboard-title">打开一个网站</div>
+            <div class="onboard-text">随便逛逛任意网页，比如搜索页、博客、登录页。</div>
+          </div>
+        </div>
+        <div class="onboard-step" data-step="1">
+          <div class="onboard-num">2</div>
+          <div class="onboard-body">
+            <div class="onboard-title">看「本页可做」</div>
+            <div class="onboard-text">页面顶部会自动出现能做的事——搜索、登录、提取表格…点一下就是任务。</div>
+          </div>
+        </div>
+        <div class="onboard-step" data-step="2">
+          <div class="onboard-num">3</div>
+          <div class="onboard-body">
+            <div class="onboard-title">开始任务</div>
+            <div class="onboard-text">mio 会自己点击、输入、翻页，像幽灵一样替你把事办完。你只管等结果。</div>
+          </div>
+        </div>
+      </div>
+      <div class="onboard-dots" id="onboardDots"></div>
+      <div class="onboard-actions">
+        <button id="onboardSkip" class="onboard-skip">跳过</button>
+        <button id="onboardNext" class="onboard-next">下一步</button>
+      </div>
+      <label class="onboard-never"><input type="checkbox" id="onboardNever"> 不再显示引导</label>
+    </div>
+  </div>
+
   <script src="../common/logger.js"></script>
   <script src="../common/protocol.js"></script>
   <script src="../common/storage.js"></script>
+  <script src="../common/error-msg.js"></script>
   <script src="../common/sync-client.js"></script>
   <script src="../common/auth-client.js"></script>
   <script src="../common/history.js"></script>           
   <script src="../common/templates.js"></script>        
   <script src="../common/suggest.js"></script>
+  <script src="../common/task-memory.js"></script>
+  <script src="../common/scheduler.js"></script>
   <script src="recovery-events.js"></script>             
   <script src="vision.js"></script>
   <script src="../llm/adapter.js"></script>              
@@ -865,6 +1183,7 @@
   <script src="runtime-protocol.js"></script>
   <script src="turn-handler.js"></script>
   <script src="metrics.js"></script>
+  <script src="failure-stats.js"></script>
   <script src="executor.js"></script>
   <script src="agent-runtime.js"></script>
   <script src="sidepanel.js"></script>
