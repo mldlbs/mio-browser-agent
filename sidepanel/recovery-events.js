@@ -21,12 +21,14 @@ function addEvent(events, event) {
 
 function renderEventStream(events) {
   if (!events || !events.errorCode) return "";
+  const msgMod = (typeof module !== "undefined" ? require("../common/error-msg.js") : globalThis.ErrorMsgModule) || null;
+  const humanize = msgMod ? msgMod.humanizeError : (code, m) => code;
   const lines = [];
   // stepId is the 0-based plan index (or an explicit step id). Show a
   // human-readable 1-based step number when it is a number.
   const stepNum = typeof events.stepId === "number" && isFinite(events.stepId) ? events.stepId + 1 : events.stepId;
   const step = stepNum != null ? `[步骤 ${stepNum}] ` : "";
-  lines.push(`${step}❌ ${events.errorCode}${events.message ? ": " + events.message : ""}`);
+  lines.push(`${step}❌ ${humanize(events.errorCode, events.message)}`);
   if (events.attempts.length) {
     lines.push("恢复:");
     for (const a of events.attempts) {

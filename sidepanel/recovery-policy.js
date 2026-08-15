@@ -2,7 +2,11 @@
 // 完全配置化，无硬编码 if(error.code)
 
 const DEFAULT_RECOVERY_POLICY = {
+  // ELEMENT_NOT_FOUND 的第一大成因是页面瞬态（SPA 渲染未完成 / 内容延迟挂载）。
+  // 先 wait 一拍让 DOM 稳定，再重取快照，比立刻重取快照成功率更高。
+  // wait maxAttempts=1：一次等待足够，避免占满恢复预算把 vision 兜底挤出。
   ELEMENT_NOT_FOUND: [
+    { action: "wait_and_retry", priority: 110, maxAttempts: 1 },
     { action: "retry_snapshot", priority: 100, maxAttempts: 2 },
     { action: "scroll_and_retry", priority: 80, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }

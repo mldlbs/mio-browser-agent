@@ -407,7 +407,7 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
     task: ctx.goal,
     stepId: ctx.currentStepId,
     recoveryAttempt: (ctx.recoveryAttempts || 0) + 1,
-    maxRecoveryAttempts: (ctx.maxRecoveryAttempts || 2) + (ctx.enableVision ? 3 : 0),
+    maxRecoveryAttempts: (ctx.maxRecoveryAttempts || 2) + (ctx.enableVision ? 4 : 0),
     lastAction: ctx.lastAction,
     lastError: { code: errorCode, message: errorDetails?.message || errorCode },
     recoveryHistory: ctx.recoveryHistory || [],
