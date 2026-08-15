@@ -425,6 +425,16 @@
     select:focus { border-color: var(--mauve); box-shadow: 0 0 0 2px rgba(203,166,247,.15); }
     #testConnection { background: transparent; color: var(--teal); border-color: rgba(148,226,213,.35); }
     #testConnection:disabled { opacity: .5; cursor: wait; }
+    /* 引导高亮：开始任务时未配 Key，自动展开设置并脉冲提示 API Key 输入框 */
+    #apiKey.key-hint {
+      border-color: var(--mauve);
+      box-shadow: 0 0 0 3px rgba(203,166,247,.35);
+      animation: key-pulse 1.2s ease-in-out 2;
+    }
+    @keyframes key-pulse {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(203,166,247,.35); }
+      50% { box-shadow: 0 0 0 6px rgba(203,166,247,.12); }
+    }
     .settings-body .full { grid-column: 1 / -1; }
     .settings-body .group-label {
       grid-column: 1 / -1;

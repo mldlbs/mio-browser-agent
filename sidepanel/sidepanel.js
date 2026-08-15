@@ -1188,9 +1188,18 @@ async function startTask(resume) {
   settings.sync = prev.sync || {};
   await setSettings(settings);
   // 本地推理（Ollama/LM Studio）允许空 Key；远端 provider 必须有 Key。
+  // 未配置时自动展开设置区并高亮 API Key 输入框，引导小白完成配置。
   if (!settings.apiKey && !isLocalProvider(settings.provider)) {
-    toast("请先填写 API Key（本地模型可留空）");
-    $("apiKey").focus();
+    const settingsEl = document.querySelector("details.settings");
+    if (settingsEl) settingsEl.open = true;
+    const keyInput = $("apiKey");
+    if (keyInput) {
+      keyInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      keyInput.classList.add("key-hint");
+      setTimeout(() => keyInput.classList.remove("key-hint"), 2500);
+      keyInput.focus();
+    }
+    toast("先在这里填 API Key（本地模型可留空）");
     return;
   }
 
