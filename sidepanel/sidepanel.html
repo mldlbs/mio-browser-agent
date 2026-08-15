@@ -426,7 +426,45 @@
     #testConnection { background: transparent; color: var(--teal); border-color: rgba(148,226,213,.35); }
     #testConnection:disabled { opacity: .5; cursor: wait; }
     .settings-body .full { grid-column: 1 / -1; }
+    .settings-body .group-label {
+      grid-column: 1 / -1;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--mauve);
+      letter-spacing: .08em;
+      margin-top: 2px;
+    }
     .settings-body .vis-head { margin-top: 4px; padding-top: 8px; border-top: 1px dashed rgba(203,166,247,.25); color: var(--subtext); font-size: 12px; }
+    /* 高级设置折叠块：视觉模型/云同步收进这里，基础配置保持紧凑 */
+    details.advanced {
+      grid-column: 1 / -1;
+      border: 1px solid var(--surface);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    details.advanced > summary {
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: var(--subtext);
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    details.advanced > summary::before { content: "▸"; font-size: 11px; transition: transform .15s; }
+    details.advanced[open] > summary { border-bottom: 1px solid var(--surface); }
+    details.advanced[open] > summary::before { transform: rotate(90deg); }
+    details.advanced > summary::-webkit-details-marker { display: none; }
+    details.advanced .advanced-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      padding: 8px 10px;
+    }
+    /* details 未展开时内容必须隐藏——advanced-body 的 display:grid 不能覆盖 */
+    details.advanced:not([open]) .advanced-body { display: none; }
+    details.advanced .advanced-body .full { grid-column: 1 / -1; }
     #saveSettings {
       grid-column: 1 / -1;
       background: var(--mauve);
@@ -937,6 +975,7 @@
     /* ── 自适应：侧边栏可被拖窄，窄宽度下收窄/单列化，避免横向溢出 ── */
     @media (max-width: 380px) {
       .settings-body { grid-template-columns: 1fr; }
+      details.advanced .advanced-body { grid-template-columns: 1fr; }
       .sched-form { grid-template-columns: 1fr; }
       .compose-actions { flex-wrap: wrap; }
       .compose-actions #start { flex: 1 1 100%; }
@@ -1053,6 +1092,7 @@
     <details class="settings">
       <summary>设置</summary>
       <div class="settings-body">
+        <div class="full group-label">基础配置</div>
         <div><label>Provider</label><select id="provider">
           <option value="openai">OpenAI</option>
           <option value="deepseek">DeepSeek</option>
@@ -1071,28 +1111,33 @@
           <button id="testConnection" style="flex:1">测试连接</button>
           <span id="testConnectionStatus" style="align-self:center; font-size:11px; color:var(--overlay)"></span>
         </div>
-        <div class="full vis-head">视觉模型（独立配置，留空则复用上方模型）</div>
-        <div><label>Vision Model</label><input id="visionModel" placeholder="glm-4v-flash"></div>
-        <div><label>Vision Base URL</label><input id="visionBaseUrl" placeholder="https://open.bigmodel.cn/api/paas/v4"></div>
-        <div class="full"><label>Vision API Key</label><input id="visionApiKey" type="password"></div>
-         <div class="full vis-head">云同步（执行历史跨设备备份，端到端加密）</div>
-         <div id="syncLoggedOut" class="full" style="display:none">
-           <div style="margin-bottom:6px"><label>邮箱</label><input id="syncEmail" type="email" placeholder="you@example.com"></div>
-           <div style="margin-bottom:6px"><label>密码</label><input id="syncPassword" type="password" placeholder="密码"></div>
-           <div style="display:flex; gap:8px">
-             <button id="syncRegister">注册</button>
-             <button id="syncLogin">登录</button>
-           </div>
-           <div class="sync-status" id="syncFormStatus"></div>
-         </div>
-         <div id="syncLoggedIn" class="full" style="display:none">
-           <div style="margin-bottom:6px; font-size:12px; color:var(--subtext)">账号: <span id="syncEmailDisplay"></span></div>
-           <div style="display:flex; gap:8px">
-             <button id="syncLogout">登出</button>
-             <button id="syncNow" title="立即同步历史">立即同步</button>
-           </div>
-           <div class="sync-status" id="syncStatus"></div>
-         </div>
+        <details class="advanced">
+          <summary>高级设置</summary>
+          <div class="advanced-body">
+            <div class="full vis-head">视觉模型（独立配置，留空则复用上方模型）</div>
+            <div><label>Vision Model</label><input id="visionModel" placeholder="glm-4v-flash"></div>
+            <div><label>Vision Base URL</label><input id="visionBaseUrl" placeholder="https://open.bigmodel.cn/api/paas/v4"></div>
+            <div class="full"><label>Vision API Key</label><input id="visionApiKey" type="password"></div>
+            <div class="full vis-head">云同步（执行历史跨设备备份，端到端加密）</div>
+            <div id="syncLoggedOut" class="full" style="display:none">
+              <div style="margin-bottom:6px"><label>邮箱</label><input id="syncEmail" type="email" placeholder="you@example.com"></div>
+              <div style="margin-bottom:6px"><label>密码</label><input id="syncPassword" type="password" placeholder="密码"></div>
+              <div style="display:flex; gap:8px">
+                <button id="syncRegister">注册</button>
+                <button id="syncLogin">登录</button>
+              </div>
+              <div class="sync-status" id="syncFormStatus"></div>
+            </div>
+            <div id="syncLoggedIn" class="full" style="display:none">
+              <div style="margin-bottom:6px; font-size:12px; color:var(--subtext)">账号: <span id="syncEmailDisplay"></span></div>
+              <div style="display:flex; gap:8px">
+                <button id="syncLogout">登出</button>
+                <button id="syncNow" title="立即同步历史">立即同步</button>
+              </div>
+              <div class="sync-status" id="syncStatus"></div>
+            </div>
+          </div>
+        </details>
         <button id="saveSettings">保存设置</button>
       </div>
     </details>
