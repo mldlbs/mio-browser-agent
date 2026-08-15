@@ -207,8 +207,9 @@ function toast(msg) {
 }
 
 // Fill a template's {placeholders} interactively, then put the completed goal
-// into the compose box. Falls back to raw goal text when there are no
-// placeholders or the user cancels.
+// into the compose box and auto-start it (one-click flow for non-technical
+// users). Falls back to raw goal text when there are no placeholders or the
+// user cancels.
 function applyTemplateWithPrompt(t) {
   const box = $("goal");
   const placeholders = TemplatesModule.extractPlaceholders(t.goal);
@@ -227,9 +228,8 @@ function applyTemplateWithPrompt(t) {
   }
   if (!ok) return;
   box.value = TemplatesModule.applyTemplate(t, values);
-  box.focus();
-  box.setSelectionRange(0, 0);
-  toast("模板已填充，可继续修改");
+  toast("已填充并开始任务");
+  startTask();
 }
 
 // Fill the Model / Base URL fields from the selected provider preset.
