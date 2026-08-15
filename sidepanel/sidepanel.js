@@ -193,12 +193,16 @@ function formatTime(ts) {
     String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
 }
 
-function setStatus(state, cls) {
+// state: planning/running/done/error/idle；detail: 可选的当前动作描述
+// （如「步骤 1/3 · 搜索」），running 时显示在徽章上，让收起计划面板的用户
+// 也能看到当前正在做什么。
+function setStatus(state, cls, detail) {
   const box = $("statusBox");
   const label = $("status");
-  if (label) label.textContent = state;
+  if (label) label.textContent = detail || state;
   if (box) {
     box.className = "status-pill " + (cls || (state === "running" || state === "planning" ? "running" : state === "done" ? "done" : state === "error" ? "error" : ""));
+    box.title = detail ? (state + " — " + detail) : "";
   }
 }
 
@@ -1252,6 +1256,7 @@ async function startTask(resume) {
         planProgress.current = 0;
         planProgress.steps = p.steps;
         expandedFailureStep = null;
+        setStatus("running", "running", `已重新规划 · ${p.steps.length} 步`);
       } else if (p.status === "done") {
         planProgress.steps = p.steps;
         planProgress.done.push(p.currentIndex);
@@ -1259,9 +1264,13 @@ async function startTask(resume) {
       } else if (p.status === "failed") {
         planProgress.failed.push(p.currentIndex);
         planProgress.current = p.currentIndex;
+        setStatus("running", "running", `步骤 ${p.currentIndex + 1}/${p.steps.length} 出问题，换个方式`);
       } else {
         planProgress.steps = p.steps;
         planProgress.current = p.currentIndex;
+        // 执行中：徽章显示「步骤 X/Y · 摘要」
+        const desc = (p.description || "").slice(0, 18);
+        setStatus("running", "running", `步骤 ${p.currentIndex + 1}/${p.steps.length}${desc ? " · " + desc : ""}`);
       }
       renderPlanPanel();
     },
