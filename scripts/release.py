@@ -235,6 +235,7 @@ def main():
     ap.add_argument("--version", default=None, help="version (default: from manifest.json)")
     ap.add_argument("--notes-file", default=None, help="path to a markdown file with release notes")
     ap.add_argument("--draft", action="store_true", help="create as a draft release")
+    ap.add_argument("--zip-only", action="store_true", help="skip crx signing (only upload the zip)")
     ap.add_argument("--pem", default=r"D:\Users\gf1913\Temp\opencode\mio-crx.pem", help="signing key")
     ap.add_argument("--out-dir", default=None, help="temp dir for artifacts (default: tempfile)")
     args = ap.parse_args()
@@ -251,8 +252,12 @@ def main():
     zip_path, n_files = build_zip(REPO, version, out_dir)
     print(f"zip: {zip_path} ({n_files} entries)")
 
-    crx_path, crx_len, crx_id = build_crx(zip_path, args.pem, os.path.join(out_dir, f"mio-browser-agent-v{version}.crx"))
-    print(f"crx: {crx_path} ({crx_len} bytes, id {crx_id})")
+    crx_path = crx_id = None
+    if args.zip_only:
+        print("zip-only mode: skipping crx signing")
+    else:
+        crx_path, crx_len, crx_id = build_crx(zip_path, args.pem, os.path.join(out_dir, f"mio-browser-agent-v{version}.crx"))
+        print(f"crx: {crx_path} ({crx_len} bytes, id {crx_id})")
 
     _run_git("fetch", "origin", "--tags", "--force")
     notes = default_notes(version)
@@ -285,10 +290,10 @@ def main():
     rid = rel["id"]
     print(f"release created: {tag} (id {rid})")
 
-    for path, label, ctype in [
-        (crx_path, f"mio-browser-agent-v{version}.crx", "application/octet-stream"),
-        (zip_path, f"mio-browser-agent-v{version}.zip", "application/zip"),
-    ]:
+    assets = [(zip_path, f"mio-browser-agent-v{version}.zip", "application/zip")]
+    if not args.zip_only and crx_path:
+        assets.insert(0, (crx_path, f"mio-browser-agent-v{version}.crx", "application/octet-stream"))
+    for path, label, ctype in assets:
         with open(path, "rb") as f:
             content = f.read()
         upath = f"/repos/{GITHUB_REPO}/releases/{rid}/assets?name={label}"
