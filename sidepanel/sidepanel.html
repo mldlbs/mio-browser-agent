@@ -70,12 +70,12 @@
       display: flex;
       align-items: center;
       gap: 10px;
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
     }
-    .brand img {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      filter: drop-shadow(0 0 6px rgba(203,166,247,.5));
+    .brand > div {
+      min-width: 0;
     }
     .brand .name {
       font-weight: 700;
@@ -85,12 +85,27 @@
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .brand .tagline {
       font-size: 10px;
       color: var(--overlay);
       letter-spacing: .14em;
       text-transform: uppercase;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .status-pill {
+      flex: none;
+    }
+    .header-auth {
+      flex: none;
+    }
+    #collapsePanel {
+      flex: none;
     }
 
     .status-pill {
@@ -937,6 +952,21 @@
       color: var(--overlay);
       text-align: center;
       letter-spacing: .1em;
+    }
+
+    /* ── 自适应：侧边栏可被拖窄，窄宽度下收窄/单列化，避免横向溢出 ── */
+    @media (max-width: 380px) {
+      .settings-body { grid-template-columns: 1fr; }
+      .sched-form { grid-template-columns: 1fr; }
+      .compose-actions { flex-wrap: wrap; }
+      .compose-actions #start { flex: 1 1 100%; }
+      .history-item-actions { flex-wrap: wrap; }
+      .onboard-card { max-width: 100%; }
+    }
+    @media (max-width: 300px) {
+      header { gap: 6px; padding-left: 10px; padding-right: 10px; }
+      .brand .tagline { display: none; }
+      .status-pill span:not(.dot) { max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     }
   </style>
 </head>
