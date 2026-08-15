@@ -316,73 +316,81 @@ async function renderTemplates() {
   host.appendChild(importBtn);
 }
 
-async function renderAuthState() {
+// ── 云同步登录（设置区内嵌，不在 header 露脸）──
+async function renderSettingsAuthState() {
   const loggedIn = await AuthClient.isLoggedIn();
-  const btn = $("authBtn");
-  const popupBody = document.querySelector("#authPopup .auth-popup-body");
+  const out = $("syncLoggedOut");
+  const inn = $("syncLoggedIn");
+  if (!out || !inn) return;
   if (loggedIn) {
     const session = await AuthClient.getSession();
-    btn.textContent = session ? session.email : "账户";
-    btn.classList.add("logged-in");
-    popupBody.innerHTML = '<div style="font-size:12px;color:var(--subtext);margin-bottom:4px">云同步已启用</div><div class="auth-popup-actions"><button id="syncNow">立即同步</button><button id="authLogout">登出</button></div><div class="auth-popup-status" id="syncPopupStatus"></div>';
-    $("authLogout").addEventListener("click", async () => {
-      const s = await AuthClient.getSession();
-      await AuthClient.logout(s && s.serverUrl);
-      $("authPopup").hidden = true;
-      await renderAuthState();
-      toast("已登出");
-    });
-    $("syncNow").addEventListener("click", async () => {
-      const session = await AuthClient.getSession();
-      if (!session) return toast("请先登录");
-      try {
-        const hist = await HistoryModule.getHistory();
-        const res = await SyncClient.syncHistory(session.serverUrl, session.token, hist);
-        if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
-        $("syncPopupStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushed;
-        toast("同步完成");
-      } catch (e) {
-        $("syncPopupStatus").textContent = "同步失败";
-      }
-    });
+    out.style.display = "none";
+    inn.style.display = "";
+    $("syncEmailDisplay").textContent = session ? session.email : "—";
+    $("syncStatus").textContent = session && session.lastSyncAt
+      ? "上次同步: " + new Date(session.lastSyncAt).toLocaleString()
+      : "";
   } else {
-    btn.textContent = "登录";
-    btn.classList.remove("logged-in");
-    popupBody.innerHTML = '<input id="authEmail" type="email" placeholder="邮箱"><input id="authPassword" type="password" placeholder="密码"><div class="auth-popup-actions"><button id="authRegister">注册</button><button id="authLogin">登录</button></div><div class="auth-popup-status" id="authPopupStatus"></div>';
-    wireAuthPopupListeners();
+    inn.style.display = "none";
+    out.style.display = "";
+    $("syncFormStatus").textContent = "";
   }
 }
 
-function wireAuthPopupListeners() {
-  $("authRegister").addEventListener("click", async () => {
-    const email = $("authEmail").value.trim();
-    const password = $("authPassword").value;
-    const serverUrl = SYNC_SERVER;
-    if (!email || !password) return toast("请填写邮箱和密码");
+async function wireSyncAuth() {
+  const registerBtn = $("syncRegister");
+  const loginBtn = $("syncLogin");
+  const logoutBtn = $("syncLogout");
+  const syncNowBtn = $("syncNow");
+  const setFormStatus = (text, ok) => {
+    const el = $("syncFormStatus");
+    if (el) { el.textContent = text; el.style.color = ok ? "var(--green)" : "var(--red)"; }
+  };
+  if (registerBtn) registerBtn.addEventListener("click", async () => {
+    const email = $("syncEmail").value.trim();
+    const password = $("syncPassword").value;
+    if (!email || !password) return setFormStatus("请填写邮箱和密码", false);
     try {
-      await AuthClient.register(email, password, serverUrl);
-      $("authPopup").hidden = true;
-      await renderAuthState();
-      toast("注册成功");
+      await AuthClient.register(email, password, SYNC_SERVER);
+      setFormStatus("注册成功", true);
+      await renderSettingsAuthState();
     } catch (e) {
-      toast("注册失败: " + (e && e.status === 409 ? "邮箱已注册" : "无法连接服务器"));
+      setFormStatus("注册失败: " + (e && e.status === 409 ? "邮箱已注册" : "无法连接服务器"), false);
     }
   });
-  $("authLogin").addEventListener("click", async () => {
-    const email = $("authEmail").value.trim();
-    const password = $("authPassword").value;
-    const serverUrl = SYNC_SERVER;
-    if (!email || !password) return toast("请填写邮箱和密码");
+  if (loginBtn) loginBtn.addEventListener("click", async () => {
+    const email = $("syncEmail").value.trim();
+    const password = $("syncPassword").value;
+    if (!email || !password) return setFormStatus("请填写邮箱和密码", false);
     try {
-      await AuthClient.login(email, password, serverUrl);
-      $("authPopup").hidden = true;
-      await renderAuthState();
-      toast("登录成功");
+      await AuthClient.login(email, password, SYNC_SERVER);
+      setFormStatus("登录成功", true);
+      await renderSettingsAuthState();
     } catch (e) {
-      toast("登录失败: " + (e && e.status === 401 ? "邮箱或密码错误" : "无法连接服务器"));
+      setFormStatus("登录失败: " + (e && e.status === 401 ? "邮箱或密码错误" : "无法连接服务器"), false);
+    }
+  });
+  if (logoutBtn) logoutBtn.addEventListener("click", async () => {
+    const s = await AuthClient.getSession();
+    await AuthClient.logout(s && s.serverUrl);
+    await renderSettingsAuthState();
+    toast("已登出");
+  });
+  if (syncNowBtn) syncNowBtn.addEventListener("click", async () => {
+    const session = await AuthClient.getSession();
+    if (!session) return toast("请先登录");
+    try {
+      const hist = await HistoryModule.getHistory();
+      const res = await SyncClient.syncHistory(session.serverUrl, session.token, hist);
+      if (res.merged && HistoryModule._setRawHistory) await HistoryModule._setRawHistory(res.merged);
+      $("syncStatus").textContent = "已同步 · 拉取 " + res.pulled + " · 上传 " + res.pushed;
+      toast("同步完成");
+    } catch (e) {
+      $("syncStatus").textContent = "同步失败";
     }
   });
 }
+
 async function init() {
   const verEl = $("version");
   if (verEl && globalThis.chrome && chrome.runtime && chrome.runtime.getManifest) {
@@ -416,7 +424,8 @@ async function init() {
 
   $("testConnection").addEventListener("click", testConnection);
 
-  await renderAuthState();
+  await renderSettingsAuthState();
+  await wireSyncAuth();
 
   $("saveSettings").addEventListener("click", async () => {
     const provider = $("provider").value;
@@ -444,20 +453,6 @@ async function init() {
     });
     toast("设置已保存");
   });
-
-  $("authBtn").addEventListener("click", (e) => {
-    e.stopPropagation();
-    $("authPopup").hidden = !$("authPopup").hidden;
-  });
-
-  document.addEventListener("click", (e) => {
-    const popup = $("authPopup");
-    const btn = $("authBtn");
-    if (popup && !popup.hidden && !popup.contains(e.target) && !btn.contains(e.target)) {
-      popup.hidden = true;
-    }
-  });
-
 
   $("start").addEventListener("click", startTask);
   $("stop").addEventListener("click", () => { if (runtime) runtime.stop(); });

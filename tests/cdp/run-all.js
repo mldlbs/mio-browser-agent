@@ -3,7 +3,7 @@
 const { spawnSync } = require("child_process");
 const path = require("path");
 
-const scripts = ["smoke.js", "run-page-tests.js", "onboarding-check.js", "layout-check.js", "history-layout-check.js", "menu-check.js", "run-extension-tests.js"];
+const scripts = ["smoke.js", "run-page-tests.js", "onboarding-check.js", "layout-check.js", "history-layout-check.js", "menu-check.js", "auth-check.js", "run-extension-tests.js"];
 let failed = 0;
 for (const s of scripts) {
   console.log("\n=== " + s + " ===");
