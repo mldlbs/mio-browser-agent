@@ -1,0 +1,22 @@
+{
+  "project": {
+    "name": "mio",
+    "type": "browser",
+    "tagline": "一个自然语言驱动的浏览器 Agent（Chrome 扩展）——告诉它你想做什么，mio 会替你点击、输入、滚动、导航、提取内容。",
+    "description": "Natural-language browser agent as a Chrome extension: zero dependencies, local-first, free. Tell it what to do and it clicks, types, scrolls, navigates and extracts content for you.",
+    "language": "JavaScript",
+    "license": "MIT",
+    "github_url": "https://github.com/mldlbs/mio-browser-agent",
+    "features": [
+      "Natural-language browser automation: tell it what to do, it operates the page",
+      "Zero dependencies: no Node, no Python, no backend — one Chrome extension",
+      "Local-first: your LLM API key stays in chrome.storage, data never leaves your machine",
+      "Any OpenAI-compatible LLM, including local models (Ollama etc.)"
+    ],
+    "competitors": [
+      "Playwright scripts: need Node + code, break when the site changes",
+      "Cloud browser agents: data leaves your machine, paid subscriptions"
+    ]
+  },
+  "topics": ["browser-automation", "chrome-extension", "ai-agent", "llm", "automation", "javascript", "local-first", "web-automation", "natural-language"]
+}
