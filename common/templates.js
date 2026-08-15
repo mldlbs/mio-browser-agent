@@ -33,6 +33,37 @@ const TEMPLATES = [
     goal: "在 {site} 的表单中填写：{fields}。逐项填入后点击提交按钮，确认提交成功并提取回执信息。",
     hint: "表单逐项填写 + 提交验证",
   },
+  // 高频场景开箱模板（传播/分享友好：goal 只含占位符，无任何凭据/URL 记录）
+  {
+    id: "daily-signin",
+    label: "每日签到",
+    goal: "打开 {site}，找到签到入口并完成每日签到，确认签到成功，总结本次签到结果。",
+    hint: "签到类站点通用（打卡/抽奖/任务中心）",
+  },
+  {
+    id: "price-watch",
+    label: "价格监控",
+    goal: "打开 {site} 的商品「{product}」详情页，提取当前价格与库存状态，用 memo 保存本次价格，对比上一次记录并总结变化。",
+    hint: "定期跑可做价格监控",
+  },
+  {
+    id: "daily-report",
+    label: "生成日报",
+    goal: "打开 {site} 的工作台/报表页，提取今天的数据指标，整理成简明日报要点。",
+    hint: "日报/数据汇总类",
+  },
+  {
+    id: "course-snatch",
+    label: "抢课报名",
+    goal: "打开 {site} 的选课/报名页，找到课程「{course}」，点击报名/抢课按钮，确认报名成功并记录结果。",
+    hint: "选课/抢名额/秒杀类",
+  },
+  {
+    id: "read-article",
+    label: "读文章存笔记",
+    goal: "打开 {site} 的文章「{article}」，提取正文，整理成要点，用 memo 保存。",
+    hint: "长文阅读 + 笔记",
+  },
 ];
 
 function applyTemplate(tpl, values) {
@@ -84,8 +115,44 @@ async function addCustomTemplate(tpl) {
   return custom;
 }
 
+// Build a portable, shareable template payload. Deliberately ONLY carries the
+// goal text (with its {placeholders}), label and hint — never credentials, URLs
+// of completed runs, or session state. Someone pasting this in gets a template
+// they can fill and run, not any private data.
+function buildShareTemplate(tpl) {
+  return {
+    app: "mio",
+    version: 1,
+    type: "template",
+    label: (tpl && tpl.label) || "我的模板",
+    goal: (tpl && tpl.goal) || "",
+    hint: (tpl && tpl.hint) || "",
+    placeholders: extractPlaceholders((tpl && tpl.goal) || ""),
+  };
+}
+
+// Parse a share payload (JSON string or already-parsed object) into a template
+// ready for addCustomTemplate. Throws on invalid/malicious-looking payloads so
+// the caller can show a friendly error instead of importing garbage.
+function parseShareTemplate(raw) {
+  let obj = raw;
+  if (typeof raw === "string") {
+    try { obj = JSON.parse(raw); }
+    catch (_) { throw new Error("分享内容不是有效的 JSON"); }
+  }
+  if (!obj || typeof obj !== "object") throw new Error("分享内容无效");
+  if (obj.type && obj.type !== "template") throw new Error("这不是 mio 模板分享（type 应为 template）");
+  const goal = String(obj.goal || "").trim();
+  if (!goal) throw new Error("模板缺少 goal 文本");
+  return {
+    label: String(obj.label || "我的模板").slice(0, 40),
+    goal: goal.slice(0, 2000),
+    hint: String(obj.hint || "分享来的模板").slice(0, 120),
+  };
+}
+
 if (typeof module !== "undefined") {
-  module.exports = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate };
+  module.exports = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate, buildShareTemplate, parseShareTemplate };
 } else {
-  globalThis.TemplatesModule = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate };
+  globalThis.TemplatesModule = { TEMPLATES, applyTemplate, findTemplateById, extractPlaceholders, getCustomTemplates, getTemplates, addCustomTemplate, buildShareTemplate, parseShareTemplate };
 }
