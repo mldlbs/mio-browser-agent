@@ -158,6 +158,10 @@ function appendLog(tag, text) {
   const log = $("log");
   const div = document.createElement("div");
   div.className = "log-line t-" + (tag || "ui");
+  const ts = document.createElement("span");
+  ts.className = "ts";
+  ts.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  div.appendChild(ts);
   const tagEl = document.createElement("span");
   tagEl.className = "tag";
   tagEl.textContent = tag ? tag + ":" : "";
@@ -170,6 +174,10 @@ function appendLog(tag, text) {
 function renderLogLine(container, tag, text) {
   const div = document.createElement("div");
   div.className = "log-line t-" + (tag || "ui");
+  const ts = document.createElement("span");
+  ts.className = "ts";
+  ts.textContent = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  div.appendChild(ts);
   const tagEl = document.createElement("span");
   tagEl.className = "tag";
   tagEl.textContent = tag ? tag + ":" : "";

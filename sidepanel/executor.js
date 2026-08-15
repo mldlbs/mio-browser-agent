@@ -799,7 +799,7 @@ async function execute(plan, ctx) {
     runCtx.currentStepId = step.id || current;
     runCtx.currentStep = step;
     
-    ctx.onLog("step", `[${current + 1}/${plan.steps.length}] ${step.description}`);
+      ctx.onLog("step", `[${current + 1}/${plan.steps.length}] ${step.description}`);
     emitProgress("running");
     const result = await executeStep(step, runCtx);
     
@@ -811,7 +811,7 @@ async function execute(plan, ctx) {
       runCtx.recoveryHistory = [];
       if (result.summary) lastSummary = result.summary;
       runCtx.completedSteps.push({ description: step.description, summary: result.summary || "" });
-      ctx.onLog("step", "DONE: " + (result.summary || "完成"));
+      ctx.onLog("step", `✓ ${result.summary || "完成"}`);
       pushStepEvent({ type: "step_done", stepIndex: doneIndex, summary: result.summary || "" });
       emitProgress("done", { summary: result.summary || "", currentIndex: doneIndex });
       emitCheckpoint();
