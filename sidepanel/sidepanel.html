@@ -662,6 +662,7 @@
     .history-item-actions {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
       flex: none;
     }
@@ -967,6 +968,14 @@
       header { gap: 6px; padding-left: 10px; padding-right: 10px; }
       .brand .tagline { display: none; }
       .status-pill span:not(.dot) { max-width: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+    /* 历史面板操作按钮较多，窄宽度下允许头部换行、缩小按钮 */
+    @media (max-width: 360px) {
+      .history-head { flex-wrap: wrap; gap: 6px; }
+      .history-actions { flex-wrap: wrap; }
+      .history-actions button { padding: 4px 8px; font-size: 10px; }
+      .history-item-head { align-items: flex-start; }
+      .history-item-actions { max-width: 100%; }
     }
   </style>
 </head>
