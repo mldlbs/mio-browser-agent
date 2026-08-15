@@ -1077,7 +1077,7 @@ function updateHistoryPager(total, totalPages) {
 }
 
 // 结果卡片：任务结束后给小白一个醒目的完成/失败反馈 + 快捷操作。
-function showResultCard(result, goal) {
+function showResultCard(result, goal, errorCode) {
   const card = $("resultCard");
   if (!card) return;
   const ok = !!result.ok;
@@ -1088,6 +1088,24 @@ function showResultCard(result, goal) {
   $("resultIcon").textContent = ok ? "✓" : "✗";
   $("resultTitle").textContent = ok ? "任务完成" : "任务未完成";
   $("resultSummary").textContent = summary;
+  // 失败时给出可操作建议（复用 error-msg 的 advice 字段）
+  const adviceEl = $("resultAdvice");
+  const detailsBtn = $("resultDetails");
+  if (!ok) {
+    const code = errorCode || inferErrorCode();
+    const msgMod = globalThis.ErrorMsgModule;
+    if (msgMod && code) {
+      const advice = msgMod.errorToHuman(code).advice;
+      adviceEl.textContent = "接下来可以： " + advice;
+      adviceEl.hidden = false;
+    } else {
+      adviceEl.hidden = true;
+    }
+    detailsBtn.hidden = false;
+  } else {
+    adviceEl.hidden = true;
+    detailsBtn.hidden = true;
+  }
   // 重新绑定操作（避免重复监听累积）
   const copyBtn = $("resultCopy");
   const tplBtn = $("resultTemplate");
@@ -1109,6 +1127,29 @@ function showResultCard(result, goal) {
     card.hidden = true;
     startTask({ goal: cardGoal });
   };
+  detailsBtn.onclick = () => {
+    // 展开第一个失败步骤的详情
+    if (planProgress.failed.length) {
+      expandedFailureStep = planProgress.failed[0];
+      planCollapsed = false;
+      renderPlanPanel();
+      const panel = $("planPanel");
+      if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+      toast("本任务没有失败的步骤");
+    }
+  };
+}
+
+// 从当前任务的 stepEvents 推断最近一次失败的错误码（兜底）。
+function inferErrorCode() {
+  if (!currentTask) return "";
+  const events = currentTask.stepEvents || [];
+  for (let i = events.length - 1; i >= 0; i--) {
+    const ev = events[i];
+    if (ev && ev.type === "recovery" && ev.kind === "error" && ev.code) return ev.code;
+  }
+  return "";
 }
 
 function hideResultCard() {
@@ -1236,16 +1277,19 @@ async function startTask(resume) {
     currentTask.replans = currentTask.stepEvents.filter((e) => e.type === "replan").length;
     currentTask.finishedAt = Date.now();
     if (!result.ok && result.resume) currentTask.resume = result.resume;
+    // historyLog 会把 currentTask 置 null，先提取失败错误码
+    const failedCode = result.ok ? "" : (result.errorCode || inferErrorCode());
     await historyLog(goal);
-    showResultCard(result, goal);
+    showResultCard(result, goal, failedCode);
     setStatus(currentTask.status, currentTask.status);
   } catch (e) {
     currentTask.status = "error";
     currentTask.summary = e.message || String(e);
     currentTask.finishedAt = Date.now();
+    const failedCode = inferErrorCode();
     await historyLog(goal);
     appendLog("error", e.message || String(e));
-    showResultCard({ ok: false, error: (e && e.message) || String(e) }, goal);
+    showResultCard({ ok: false, error: (e && e.message) || String(e) }, goal, failedCode);
     setStatus("error", "error");
   } finally {
     $("start").disabled = false;

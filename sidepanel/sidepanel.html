@@ -584,6 +584,16 @@
       max-height: 80px;
       overflow-y: auto;
     }
+    .result-advice {
+      font-size: 11px;
+      color: var(--lavender);
+      margin-top: 6px;
+      line-height: 1.5;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(180,190,254,.08);
+      border: 1px solid rgba(180,190,254,.2);
+    }
     .result-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
     .result-actions button {
       padding: 4px 10px;
@@ -594,9 +604,11 @@
     #resultCopy { color: var(--teal); border-color: rgba(148,226,213,.35); }
     #resultTemplate { color: var(--yellow, #f9e2af); border-color: rgba(249,226,175,.35); }
     #resultRerun { color: var(--mauve); border-color: rgba(203,166,247,.4); }
+    #resultDetails { color: var(--pink); border-color: rgba(245,194,231,.35); }
     #resultCopy:hover { background: rgba(148,226,213,.12); }
     #resultTemplate:hover { background: rgba(249,226,175,.12); }
     #resultRerun:hover { background: rgba(203,166,247,.12); }
+    #resultDetails:hover { background: rgba(245,194,231,.12); }
 
     /* log */
     .log-wrap {
@@ -1233,10 +1245,12 @@
       <div class="result-body">
         <div class="result-title" id="resultTitle">任务完成</div>
         <div class="result-summary" id="resultSummary"></div>
+        <div class="result-advice" id="resultAdvice" hidden></div>
         <div class="result-actions">
           <button id="resultCopy" title="复制结果到剪贴板">复制结果</button>
           <button id="resultTemplate" title="保存为可复用模板">存模板</button>
           <button id="resultRerun" title="用同样目标重新执行">再跑一次</button>
+          <button id="resultDetails" title="查看失败详情" hidden>查看失败详情</button>
         </div>
       </div>
     </div>

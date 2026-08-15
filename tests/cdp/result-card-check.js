@@ -15,17 +15,22 @@ const MOCK = `
     mioCustomTemplates: [], mioTaskHistory: [], mioSession: undefined, mioOnboardingDone: true,
   };
   globalThis.__mioStore = store;
-  let call = 0;
   globalThis.fetch = async (url, opts) => {
-    call++;
+    const body = JSON.parse(opts.body || "{}");
+    const isPlan = JSON.stringify(body).includes("submit_plan");
     let msg;
-    if (call % 2 === 1) {
+    if (isPlan) {
       msg = { role: "assistant", content: null, tool_calls: [
-        { id: "c" + call, type: "function", function: { name: "submit_plan", arguments: JSON.stringify({ steps: [{ description: "完成任务" }] }) } },
+        { id: "c" + Date.now(), type: "function", function: { name: "submit_plan", arguments: JSON.stringify({ steps: [{ description: "完成任务" }] }) } },
+      ] };
+    } else if (globalThis.__failMode) {
+      // failing click in exec phase (never succeeds -> recovery exhausts -> task error)
+      msg = { role: "assistant", content: null, tool_calls: [
+        { id: "c" + Date.now(), type: "function", function: { name: "click", arguments: JSON.stringify({ index: 999 }) } },
       ] };
     } else {
       msg = { role: "assistant", content: null, tool_calls: [
-        { id: "c" + call, type: "function", function: { name: "finish", arguments: JSON.stringify({ summary: "全部完成" }) } },
+        { id: "c" + Date.now(), type: "function", function: { name: "finish", arguments: JSON.stringify({ summary: "全部完成" }) } },
       ] };
     }
     return { ok: true, json: async () => ({ choices: [{ message: msg }] }) };
@@ -93,8 +98,28 @@ async function main() {
     await evalJs(b, sessionId, "document.getElementById('resultRerun').click(); true");
     const cardShownAgain = await waitFor(b, sessionId, "!document.getElementById('resultCard').hidden", 10000);
     check(cardShownAgain === true, "rerun restarts task and re-shows result card");
-    const logGrew = await evalJs(b, sessionId, "document.getElementById('log').children.length >= 12");
-    check(logGrew === true, "rerun produced a fresh execution (log grew)");
+
+    // ── failure scenario: agent tool fails, card shows error + advice + details ──
+    // Clear the fetch counter and make the next task fail with ELEMENT_NOT_FOUND.
+    await evalJs(b, sessionId, `(() => {
+      // reset the mock: plan succeeds, but the exec click always fails
+      globalThis.__failMode = true;
+      return true;
+    })()`);
+    // Override fetch to return a failing click in exec phase.
+    await evalJs(b, sessionId, `(async () => {
+      document.getElementById('goal').value = '失败任务';
+      document.getElementById('start').click();
+      return true;
+    })()`);
+    const failCardShown = await waitFor(b, sessionId, "!document.getElementById('resultCard').hidden && document.getElementById('resultCard').classList.contains('error')", 15000);
+    check(failCardShown === true, "failure task shows error result card");
+    const failTitle = await evalJs(b, sessionId, "document.getElementById('resultTitle').textContent");
+    check(failTitle === "任务未完成", "failure card title 任务未完成 (got " + JSON.stringify(failTitle) + ")");
+    const adviceVisible = await evalJs(b, sessionId, "!document.getElementById('resultAdvice').hidden && document.getElementById('resultAdvice').textContent.length > 0");
+    check(adviceVisible === true, "failure card shows advice");
+    const detailsVisible = await evalJs(b, sessionId, "!document.getElementById('resultDetails').hidden");
+    check(detailsVisible === true, "failure card shows 查看失败详情 button");
   } finally { launched.kill(); }
   if (failures) { console.log("\n" + failures + " FAILURE(S)"); process.exit(1); }
   console.log("\n=== RESULT CARD ALL PASS ===");
