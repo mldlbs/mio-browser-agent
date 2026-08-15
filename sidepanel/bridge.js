@@ -8,6 +8,13 @@ async function getActiveTabId() {
   return (await getActiveTab()).id;
 }
 
+// Resolve the target tab for a bridge: a pinned tabId (scheduled tasks run on a
+// specific tab even when it is not active) or the active tab otherwise.
+async function resolveTargetTab(tabId) {
+  if (tabId != null) return chrome.tabs.get(tabId);
+  return getActiveTab();
+}
+
 const CONTENT_FILES = [
   "common/protocol.js",
   "content/snapshot.js",
@@ -20,18 +27,18 @@ async function ensureContentScript(tabId) {
   await chrome.scripting.executeScript({ target: { tabId }, files: CONTENT_FILES });
 }
 
-async function sendToTab(type, payload, frameId) {
-  const tab = await getActiveTab();
-  const tabId = tab.id;
+async function sendToTab(type, payload, frameId, tabId) {
+  const tab = await resolveTargetTab(tabId);
   const describe = () => `当前页面: ${tab.url || "(无法获取 URL)"}`;
   const opts = frameId != null ? { frameId } : {};
+  const tabIdFor = tab.id;
   let res;
   try {
-    res = await chrome.tabs.sendMessage(tabId, make(type, payload), opts);
+    res = await chrome.tabs.sendMessage(tabIdFor, make(type, payload), opts);
   } catch (e) {
     try {
-      await ensureContentScript(tabId);
-      res = await chrome.tabs.sendMessage(tabId, make(type, payload), opts);
+      await ensureContentScript(tabIdFor);
+      res = await chrome.tabs.sendMessage(tabIdFor, make(type, payload), opts);
     } catch (e2) {
       throw new Error(`无法与页面通信，请刷新当前页面后重试 (${describe()} / ${e2 && e2.message || e.message})`);
     }
@@ -39,21 +46,14 @@ async function sendToTab(type, payload, frameId) {
   return res;
 }
 
-// Enumerate every frame (including cross-origin iframes) of the active tab.
-async function listFrames() {
-  const tab = await getActiveTab();
-  const frames = await chrome.webNavigation.getAllFrames({ tabId: tab.id });
-  return frames || [];
-}
-
-function createPageBridge() {
+function createPageBridge({ tabId } = {}) {
   return {
     // Lightweight main-frame-only snapshot for UI hints (task suggestions).
     // Much faster than the full multi-frame snapshot; element indexes are
     // NOT meant for action targeting (use snapshot() for that).
     async snapshotPeek() {
-      const mainTab = await getActiveTab();
-      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true });
+      const mainTab = await resolveTargetTab(tabId);
+      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true }, null, mainTab.id);
       if (!res || res.type !== MSG.SNAPSHOT_RESPONSE) throw new Error("bad snapshot response");
       const snap = res.payload.snapshot || {};
       return {
@@ -67,10 +67,10 @@ function createPageBridge() {
       };
     },
     async snapshot() {
-      const frames = await listFrames();
+      const mainTab = await resolveTargetTab(tabId);
+      const frames = await chrome.webNavigation.getAllFrames({ tabId: mainTab.id });
       const main = frames.find((f) => f.frameId === 0);
-      const mainTab = await getActiveTab();
-      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true });
+      const res = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true }, null, mainTab.id);
       if (!res || res.type !== MSG.SNAPSHOT_RESPONSE) throw new Error("bad snapshot response");
       const tabs = await chrome.tabs.query({ windowId: mainTab.windowId });
       const tabIndex = tabs.findIndex((t) => t.active && t.windowId === mainTab.windowId);
@@ -91,7 +91,7 @@ function createPageBridge() {
         if (f.frameId === 0) continue;
         let fres;
         try {
-          fres = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true }, f.frameId);
+          fres = await sendToTab(MSG.SNAPSHOT_REQUEST, { taskId: Date.now(), frameOnly: true }, f.frameId, mainTab.id);
         } catch (_) { continue; } // frame may have navigated away; skip it
         if (!fres || fres.type !== MSG.SNAPSHOT_RESPONSE) continue;
         const elems = fres.payload.snapshot.elements || [];
@@ -107,13 +107,14 @@ function createPageBridge() {
     async executeAction(action) {
       const target = action.target || {};
       const frameId = target.frameId;
-      const res = await sendToTab(MSG.ACTION_EXECUTE, { taskId: Date.now(), action }, frameId);
+      const mainTab = await resolveTargetTab(tabId);
+      const res = await sendToTab(MSG.ACTION_EXECUTE, { taskId: Date.now(), action }, frameId, mainTab.id);
       if (!res || res.type !== MSG.ACTION_RESULT) throw new Error("bad action response");
       return res.payload.result;
     },
-    // Screenshot the active tab as a base64 data URL (for vision-based recovery).
+    // Screenshot the target tab as a base64 data URL (for vision-based recovery).
     async capture() {
-      const tab = await getActiveTab();
+      const tab = await resolveTargetTab(tabId);
       try {
         const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "png" });
         return dataUrl || null;
@@ -134,7 +135,7 @@ function createPageBridge() {
     // view-source, PDF viewer). Returns once the update is issued; the caller
     // waits for the new page's content script to become ready.
     async navigate(url) {
-      const tab = await getActiveTab();
+      const tab = await resolveTargetTab(tabId);
       await chrome.tabs.update(tab.id, { url });
       return { ok: true, value: `navigating to ${url}`, pendingNavigation: true };
     },
@@ -142,7 +143,8 @@ function createPageBridge() {
     // crisper than a full-page screenshot for small verification codes).
     async captureCanvas(target) {
       const frameId = target && target.frameId;
-      const res = await sendToTab(MSG.CANVAS_READ_REQUEST, { taskId: Date.now(), target: target || null }, frameId);
+      const mainTab = await resolveTargetTab(tabId);
+      const res = await sendToTab(MSG.CANVAS_READ_REQUEST, { taskId: Date.now(), target: target || null }, frameId, mainTab.id);
       if (!res || res.type !== MSG.CANVAS_READ_RESPONSE) return null;
       const result = res.payload && res.payload.result;
       return result && result.ok ? result.value : null;
