@@ -827,11 +827,6 @@ async function importTemplate() {
   }
 }
 
-// "存为模板并分享" for a template chip: copy its share JSON directly.
-async function shareTemplateFromChip(t) {
-  await copyShareTemplate(t);
-}
-
 async function historyLog(goal) {
   if (!currentTask) return;
   currentTask.logs.push({ tag: "debug", text: "目标: " + goal, ts: Date.now() });
