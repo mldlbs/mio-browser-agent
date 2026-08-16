@@ -26,6 +26,7 @@
 12. **复杂任务反复重试/重规划修复（P0）**：maxTurns 耗尽带 `STEP_TURNS_EXHAUSTED` errorCode + planner 对应 replan 引导（拆小动作/每轮明确一个调用/尽快 finish）；replan 无进展防抖——新计划与旧计划剩余步骤相同时立即停止（`REPLAN_NO_PROGRESS`），不再无进展重试到 maxReplans；更新被坏行为编码的旧测试。
 13. **页面状态分类（Browser State P0 轻量版）**：`common/page-state.js` 快照特征→页面状态（LOGIN/SEARCH/FORM/TABLE/LIST/DETAIL/EMPTY/GENERIC，优先级：登录>搜索>表格>表单>列表>详情）；executor 每轮向 prompt 注入「[页面状态: X] 是什么页面、优先找什么」，缩小 agent 搜索空间（不再每轮从平铺元素猜目标）。
 14. **Recovery 动作扩展（P0 剩余）**：新增 `dismiss_modal`（content `dismissModal` action：点关闭控件/按 Escape，治弹窗遮挡）、`refresh`（bridge `reload`，治页面过期）、`go_back`（bridge `goBack`，治导航错误）；policy 表配置（ELEMENT_NOT_FOUND 加 dismiss_modal，TIMEOUT/SCROLL_AT_END/CLICK_AT_UNVERIFIED 加 refresh）；vision 兜底预算 +5；test-page.html 加弹窗场景 + CDP 实测。
+15. **Scene Graph 轻量版（P1）**：快照元素加 `group` 字段（最近语义容器 form/弹窗/tabpanel，如 `form#login`），snapshotToLines 行尾显示 `<form#login>`，agent 能关联同组元素，页面重排时不必依赖纯 index；CDP 实测表单控件共享 group。
 
 ## 关键文件
 

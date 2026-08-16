@@ -130,6 +130,17 @@ function assertEq(got, want, name) {
   assert(hrefLines.includes('[0] link "商品卡" → /item/12345.html'), "snapshotToLines renders link href destination");
   assert(hrefLines.includes('[1] link "店铺" → /store/999'), "snapshotToLines renders shop href");
   assert(hrefLines.includes('[2] link "无链接"') && !hrefLines.includes('[2] link "无链接" →'), "snapshotToLines omits dest when no href");
+  // Scene Graph 轻量版：group 语义容器显示在快照行，帮助关联同组元素
+  const snapGroup = { url: "https://x.com", title: "X", elements: [
+    { index: 0, role: "textbox", name: "用户名", group: "form#login", boundingBox: null },
+    { index: 1, role: "textbox", name: "密码", group: "form#login", boundingBox: null },
+    { index: 2, role: "button", name: "登录", group: "form#login", boundingBox: null },
+    { index: 3, role: "link", name: "无容器", group: "", boundingBox: null },
+  ]};
+  const groupLines = protocol.snapshotToLines(snapGroup);
+  assert(groupLines.includes('"用户名" <form#login>'), "snapshotToLines renders semantic group (got: " + groupLines.split("\n")[0] + ")");
+  assert(groupLines.includes('"登录" <form#login>'), "snapshotToLines groups sibling form controls");
+  assert(!groupLines.includes('"无容器" <'), "snapshotToLines omits group when empty");
 
   // ── hasInteractiveDescendant: nested anchors must not disqualify a card ──
   function mockEl(sel, children = []) {

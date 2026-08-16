@@ -21,6 +21,11 @@ const { openTab, runInPage, report } = require("./page-runner");
       check(!!inp, "snapshot finds textbox with placeholder");
       const ed = snap.elements.find((e) => e.role === "textbox" && e.tag === "div");
       check(!!ed, "snapshot finds contenteditable as textbox");
+      // Scene Graph 轻量版：表单元素带 group（语义容器），同组元素共享容器标识
+      const ffUserEl = snap.elements.find((e) => e.role === "textbox" && e.name.includes("用户名"));
+      check(!!ffUserEl && /form#login-form/.test(ffUserEl.group || ""), "snapshot tags form controls with their semantic group", ffUserEl && ffUserEl.group);
+      const loginBtnEl = snap.elements.find((e) => e.role === "button" && e.name.includes("登录") && (e.group || "").includes("login-form"));
+      check(!!loginBtnEl, "login button shares the same group as its form fields");
 
       const el = locateElement(btn);
       check(!!el && el.id === "btn-login", "locator round-trips snapshot element", el && el.id);

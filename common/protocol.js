@@ -49,7 +49,10 @@ function snapshotToLines(snapshot) {
     const box = e.boundingBox ? ` (${e.boundingBox.x},${e.boundingBox.y} ${e.boundingBox.w}x${e.boundingBox.h})` : "";
     const dest = e.href ? ` → ${e.href}` : "";
     const frame = e.frameId ? ` [frame ${e.frameId}]` : "";
-    lines.push(`[${e.index}] ${e.role} "${e.name}"${dest}${frame}${state.length ? " " + state.join(" ") : ""}${box}`);
+    // Scene Graph 轻量版：显示元素所属语义容器（表单/弹窗等），帮助 agent
+    // 关联同组元素，页面重排时不必依赖纯 index。
+    const group = e.group ? ` <${e.group}>` : "";
+    lines.push(`[${e.index}] ${e.role} "${e.name}"${dest}${frame}${state.length ? " " + state.join(" ") : ""}${group}${box}`);
   });
   if (elems.length > MAX_RENDER) {
     lines.push(`… 还有 ${elems.length - MAX_RENDER} 个元素未列出（共 ${elems.length}）`);

@@ -190,6 +190,23 @@ function elementValue(el) {
   return "";
 }
 
+// 语义容器：元素最近的表单 / 弹窗 / 有明显标识的容器（Scene Graph 轻量版）。
+// 返回如 "form#login" / "dialog" / "div.search-box" / ""。供 agent 关联同组元素，
+// 页面重排时不必依赖纯 index。
+function semanticGroup(el) {
+  const holder = el.closest("form, [role=dialog], [role=tabpanel], [data-modal], dialog");
+  if (holder) {
+    const tag = holder.tagName.toLowerCase();
+    const id = holder.id ? "#" + holder.id : "";
+    const cls = holder.className && typeof holder.className === "string"
+      ? "." + String(holder.className).trim().split(/\s+/).filter(Boolean).slice(0, 2).join(".")
+      : "";
+    const name = holder.getAttribute && holder.getAttribute("name");
+    return tag + id + cls + (name ? "[name=" + name + "]" : "");
+  }
+  return "";
+}
+
 function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
   const candidates = Array.from(root.querySelectorAll(INTERACTIVE_SELECTOR));
   candidates.forEach((el) => {
@@ -215,6 +232,7 @@ function scanRoot(root, framePath, shadowPath, elements, visited, opts) {
       href: href ? truncate(href, 200) : "",
       framePath: framePath || [],
       shadowPath: shadowPath || [],
+      group: semanticGroup(el),
     });
   });
   // Recurse into same-origin iframes (cross-origin access throws). Skipped in
