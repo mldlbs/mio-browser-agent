@@ -173,6 +173,17 @@ const { openTab, runInPage, report } = require("./page-runner");
       const overScroll = await executeAction({ name: "scroll", target: null, args: { delta: 500 } });
       check(!overScroll.ok && overScroll.errorCode === "SCROLL_AT_END", "scroll past bottom returns SCROLL_AT_END", (overScroll && overScroll.error) || "");
 
+      // dismissModal: 点击关闭控件关掉弹窗（recovery 动作 dismiss_modal 的 content 端）
+      document.getElementById("modal-box").style.display = "flex";
+      const dmRes = await executeAction({ name: "dismissModal", target: null, args: {} });
+      const modalGone = document.getElementById("modal-box").style.display === "none";
+      const closedCount = window.__modalClosed || 0;
+      check(dmRes.ok && modalGone && closedCount === 1, "dismissModal clicks the close control to close the modal", JSON.stringify(dmRes) + " closed=" + closedCount);
+      // 关闭后背后的按钮应可点击（弹窗不再遮挡）
+      const behindRes = await executeAction({ name: "click", target: { role: "button", name: "弹窗背后的按钮" }, args: {} });
+      const behindClicks = window.__behindModalClicks || 0;
+      check(behindRes.ok && behindClicks === 1, "modal-occluded button clickable after dismiss", behindRes.ok + " clicks=" + behindClicks);
+
       // readCanvasBitmap：把 canvas 位图直接交给视觉模型（比整页截图清晰）
       const cctx = document.getElementById("captcha-canvas").getContext("2d");
       cctx.fillStyle = "#fff"; cctx.fillRect(0, 0, 120, 40);

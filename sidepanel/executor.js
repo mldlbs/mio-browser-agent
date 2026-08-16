@@ -416,7 +416,7 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
     task: ctx.goal,
     stepId: ctx.currentStepId,
     recoveryAttempt: (ctx.recoveryAttempts || 0) + 1,
-    maxRecoveryAttempts: (ctx.maxRecoveryAttempts || 2) + (ctx.enableVision ? 4 : 0),
+    maxRecoveryAttempts: (ctx.maxRecoveryAttempts || 2) + (ctx.enableVision ? 5 : 0),
     lastAction: ctx.lastAction,
     lastError: { code: errorCode, message: errorDetails?.message || errorCode },
     recoveryHistory: ctx.recoveryHistory || [],
@@ -483,6 +483,47 @@ async function handleRecovery(ctx, errorCode, errorDetails) {
       ctx.recoveryHistory = ctx.recoveryHistory || [];
       ctx.recoveryHistory.push("wait_and_retry");
       emit({ kind: "attempt", action, reason: recoveryResult.detail?.reason || "等待后重试", ok: true, attempt });
+      return okFor;
+
+    case "dismiss_modal":
+      // 元素被弹窗/遮罩遮挡：尝试关闭弹窗（点关闭控件或按 Escape），然后继续重试。
+      try {
+        const dm = await ctx.bridge.executeAction({ name: "dismissModal", target: null, args: {} });
+        ctx.recoveryAttempts = attempt;
+        ctx.recoveryHistory = ctx.recoveryHistory || [];
+        ctx.recoveryHistory.push("dismiss_modal");
+        emit({ kind: "attempt", action, reason: dm && dm.ok ? ("关闭弹窗: " + (dm.value || "").slice(0, 40)) : "尝试关闭弹窗", ok: true, attempt });
+      } catch (e) {
+        emit({ kind: "attempt", action, reason: "关闭弹窗失败: " + ((e && e.message) || String(e)).slice(0, 60), ok: false, attempt });
+      }
+      return okFor;
+
+    case "refresh":
+      // 页面过期/加载失败：重载当前页，然后继续重试。
+      try {
+        await ctx.bridge.reload();
+        await sleep(1500);
+        ctx.recoveryAttempts = attempt;
+        ctx.recoveryHistory = ctx.recoveryHistory || [];
+        ctx.recoveryHistory.push("refresh");
+        emit({ kind: "attempt", action, reason: "页面已重载", ok: true, attempt });
+      } catch (e) {
+        emit({ kind: "attempt", action, reason: "重载失败: " + ((e && e.message) || String(e)).slice(0, 60), ok: false, attempt });
+      }
+      return okFor;
+
+    case "go_back":
+      // 导航到了错误的页面：回退浏览器历史，然后继续重试。
+      try {
+        await ctx.bridge.goBack();
+        await sleep(1200);
+        ctx.recoveryAttempts = attempt;
+        ctx.recoveryHistory = ctx.recoveryHistory || [];
+        ctx.recoveryHistory.push("go_back");
+        emit({ kind: "attempt", action, reason: "已回退上一页", ok: true, attempt });
+      } catch (e) {
+        emit({ kind: "attempt", action, reason: "回退失败: " + ((e && e.message) || String(e)).slice(0, 60), ok: false, attempt });
+      }
       return okFor;
 
     case "vision_locate":

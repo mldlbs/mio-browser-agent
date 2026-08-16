@@ -6,6 +6,12 @@
   <style>body { font-family: monospace; background: #111; color: #cdd6f4; padding: 16px; }</style>
 </head>
 <body>
+  <div id="modal-box" style="position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:10;">
+    <div style="background:#222; padding:20px; border-radius:8px;">
+      <button id="modal-close" onclick="window.__modalClosed=(window.__modalClosed||0)+1;document.getElementById('modal-box').style.display='none'">关闭</button>
+    </div>
+  </div>
+  <button id="btn-behind-modal" onclick="window.__behindModalClicks=(window.__behindModalClicks||0)+1">弹窗背后的按钮</button>
   <h1>content 逻辑浏览器测试</h1>
   <button id="btn-login" onclick="window.__clicked=(window.__clicked||0)+1;window.__clickedAt=(window.__clickedAt||0)+1">登录</button>
   <label for="input-search">搜索</label>

@@ -5,9 +5,12 @@ const DEFAULT_RECOVERY_POLICY = {
   // ELEMENT_NOT_FOUND 的第一大成因是页面瞬态（SPA 渲染未完成 / 内容延迟挂载）。
   // 先 wait 一拍让 DOM 稳定，再重取快照，比立刻重取快照成功率更高。
   // wait maxAttempts=1：一次等待足够，避免占满恢复预算把 vision 兜底挤出。
+  // dismiss_modal：元素可能被弹窗/遮罩挡住（登录弹窗、Cookie 同意条、订阅弹窗），
+  // 先尝试关掉弹窗再重试。
   ELEMENT_NOT_FOUND: [
     { action: "wait_and_retry", priority: 110, maxAttempts: 1 },
     { action: "retry_snapshot", priority: 100, maxAttempts: 2 },
+    { action: "dismiss_modal", priority: 90, maxAttempts: 1 },
     { action: "scroll_and_retry", priority: 80, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
   ],
@@ -17,6 +20,7 @@ const DEFAULT_RECOVERY_POLICY = {
   ],
   TIMEOUT: [
     { action: "wait_and_retry", priority: 100, maxAttempts: 2 },
+    { action: "refresh", priority: 60, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
   ],
   NO_TOOL_CALLS: [
@@ -26,6 +30,7 @@ const DEFAULT_RECOVERY_POLICY = {
   ],
   CLICK_AT_UNVERIFIED: [
     { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
+    { action: "refresh", priority: 50, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
   ],
   CLICK_OUT_OF_VIEWPORT: [
@@ -39,10 +44,10 @@ const DEFAULT_RECOVERY_POLICY = {
   ],
   // Already at a scroll boundary: further scroll can never reach the target, so
   // the only DOM-side option is a fresh snapshot (target may have re-rendered).
-  // vision_locate is appended when the vision fallback is enabled so a target
-  // that IS visible but outside the DOM locator can still be reached by pixels.
+  // refresh：内容可能加载失败/页面过期，重载一次再试。
   SCROLL_AT_END: [
     { action: "retry_snapshot", priority: 90, maxAttempts: 1 },
+    { action: "refresh", priority: 50, maxAttempts: 1 },
     { action: "finish", priority: 10, maxAttempts: 1 }
   ],
   // A control is disabled (often a transient React/editor sync state right after

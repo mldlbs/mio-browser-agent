@@ -139,6 +139,18 @@ function createPageBridge({ tabId } = {}) {
       await chrome.tabs.update(tab.id, { url });
       return { ok: true, value: `navigating to ${url}`, pendingNavigation: true };
     },
+    // Reload the current tab (recovery: stale/expired page).
+    async reload() {
+      const tab = await resolveTargetTab(tabId);
+      await chrome.tabs.reload(tab.id);
+      return { ok: true, value: "reloading page", pendingNavigation: true };
+    },
+    // Go back in browser history (recovery: navigated to the wrong page).
+    async goBack() {
+      const tab = await resolveTargetTab(tabId);
+      await chrome.tabs.goBack(tab.id);
+      return { ok: true, value: "going back in history", pendingNavigation: true };
+    },
     // Read the exact bitmap of a captcha canvas/img as a PNG data URL (much
     // crisper than a full-page screenshot for small verification codes).
     async captureCanvas(target) {

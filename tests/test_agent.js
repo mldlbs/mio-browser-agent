@@ -1409,7 +1409,11 @@ function assertEq(got, want, name) {
   const sorted = policy.getAllowedActions("ELEMENT_NOT_FOUND");
   assert(sorted[0].action === "wait_and_retry" && sorted[0].priority === 110, "policy sorts ELEMENT_NOT_FOUND by priority desc (wait first for transient renders)");
   assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").some((a) => a.action === "finish"), "policy includes finish as fallback");
-  assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").length === 4, "policy exposes all configured actions");
+  assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").length === 5, "policy exposes all configured actions (incl dismiss_modal)");
+  assert(policy.getAllowedActions("ELEMENT_NOT_FOUND").some((a) => a.action === "dismiss_modal"), "ELEMENT_NOT_FOUND includes dismiss_modal (modal occlusion)");
+  assert(policy.getAllowedActions("TIMEOUT").some((a) => a.action === "refresh"), "TIMEOUT includes refresh");
+  assert(policy.getAllowedActions("SCROLL_AT_END").some((a) => a.action === "refresh"), "SCROLL_AT_END includes refresh");
+  assert(policy.getAllowedActions("CLICK_AT_UNVERIFIED").some((a) => a.action === "refresh"), "CLICK_AT_UNVERIFIED includes refresh");
   assert(policy.getAllowedActions("UNKNOWN_CODE").length === 0, "policy returns empty for unknown error code");
   assert(policy.getMaxAttemptsForAction("NO_TOOL_CALLS", "scroll_and_retry") === 1, "policy exposes per-action max attempts");
   assert(policy.getAllowedActions("SCROLL_AT_END").length > 0, "policy covers SCROLL_AT_END");
@@ -2231,16 +2235,17 @@ function assertEq(got, want, name) {
   const vpVision = vpActions.findIndex((a) => a.action === "vision_locate");
   assert(vpVision > -1 && vpVision < vpFinish, "vision_locate sits above finish (last resort before giving up)");
 
-  // executor runs vision_locate as last resort when enabled: DOM retries exhaust, then vision
-  const visionEvents = [];
-  const visionLlm = mockLlm([
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover scroll_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover vision_locate
-    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }), // turn6 → succeed
-  ]);
+// executor runs vision_locate as last resort when enabled: DOM retries exhaust, then vision
+const visionEvents = [];
+const visionLlm = mockLlm([
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover dismiss_modal
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover scroll_and_retry
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover retry_snapshot
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn6 → recover vision_locate
+  () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "ok" })] }), // turn7 → succeed
+]);
   const visionBridge = {
     snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),
     executeAction: async (a) => ({ ok: true, value: "did " + a.name }),
@@ -2255,12 +2260,38 @@ function assertEq(got, want, name) {
       onLog: () => {}, onRecovery: (ev) => visionEvents.push(ev),
       enableVision: true, history: [{ role: "system", content: "" }],
       plan: { goal: "g", steps: [{ description: "点不存在元素" }] }, goal: "g",
-      maxTurns: 6, maxRecoveryAttempts: 2, isStopped: () => false,
+      maxTurns: 8, maxRecoveryAttempts: 2, isStopped: () => false,
       visionLlm: visionRuntimeLlm, // injected for the vision pass
     }
   );
   assert(vExec.ok && vExec.summary === "ok", "enabled vision recovery lets the step succeed");
   assert(visionEvents.some((e) => e.action === "vision_locate"), "vision_locate recovery event emitted");
+
+  // ── dismiss_modal recovery：ELEMENT_NOT_FOUND 恢复序列含 dismiss_modal，
+  //    会调 content 的 dismissModal action（关弹窗）──
+  const dmCalls = [];
+  const dmBridge = {
+    snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),
+    executeAction: async (a) => { if (a.name === "dismissModal") dmCalls.push(a); return { ok: true, value: "did " + a.name }; },
+  };
+  const dmLlm = mockLlm(Array.from({ length: 6 }, () =>
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] })  // 永远失败，触发恢复链
+  ));
+  const dmEvents = [];
+  const dmExec = await executorMod.executeStep(
+    { description: "点被弹窗遮挡的元素" },
+    {
+      llm: dmLlm, bridge: dmBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, onRecovery: (ev) => dmEvents.push(ev),
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "点被弹窗遮挡的元素" }] }, goal: "g",
+      maxTurns: 8, maxRecoveryAttempts: 4, isStopped: () => false,
+    }
+  );
+  assert(dmCalls.length === 1, "dismiss_modal calls the content dismissModal action once");
+  assert(dmEvents.some((e) => e.kind === "attempt" && e.action === "dismiss_modal"), "recovery emits dismiss_modal attempt");
+  assert(!dmExec.ok, "endless failure still fails the step after recoveries");
 
   // vision disabled: never selects vision_locate, step still fails after DOM exhaustion
   const noVisionEvents = [];
@@ -2307,15 +2338,16 @@ function assertEq(got, want, name) {
 
   // ── vision recovery with coordinates hands the agent a click_at hint ──
   const coordEvents = [];
-  const coordLlm = mockLlm([
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover scroll_and_retry
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover retry_snapshot
-    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover vision_locate (has coords)
-    () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 512, y: 360 })] }), // turn6 → agent clicks at coords
-    () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了" })] }), // turn7 → done
-  ]);
+const coordLlm = mockLlm([
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn1 → recover wait_and_retry
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn2 → recover retry_snapshot
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn3 → recover dismiss_modal
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn4 → recover scroll_and_retry
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn5 → recover retry_snapshot
+  () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] }), // turn6 → recover vision_locate (has coords)
+  () => ({ content: "", toolCalls: [makeToolCall("click_at", { x: 512, y: 360 })] }), // turn7 → agent clicks at coords
+  () => ({ content: "", toolCalls: [makeToolCall("finish", { summary: "点了" })] }), // turn8 → done
+]);
   const coordVisionLlm = { generate: async (msgs, opts) => ({ content: "目标可见。x:512, y:360" }) };
   const coordBridge = {
     snapshot: async () => ({ url: "u", title: "t", elements: [{ index: 0, role: "button", name: "存在" }] }),

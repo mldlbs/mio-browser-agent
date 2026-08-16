@@ -145,6 +145,23 @@ async function executeAction(action) {
     location.href = args.url;
     return { ok: true, value: `navigating to ${args.url}`, pendingNavigation: true };
   }
+  if (name === "dismissModal") {
+    // 目标元素被弹窗/遮罩遮挡时调用：优先点关闭按钮（可交互、可见、名字
+    // 含 关闭/取消/×/close/cancel），否则按 Escape。返回是否关掉了某东西。
+    const CLOSE_HINTS = /(关闭|取消|知道|确定|×|x|close|dismiss|cancel|ok|got it)/i;
+    const buttons = Array.from(document.querySelectorAll("button,[role=button],a"))
+      .filter((el) => isVisible(el) && !hasInteractiveDescendant(el));
+    const closeBtn = buttons.find((el) => CLOSE_HINTS.test((computeAccessibleName(el) || "") + " " + (el.textContent || "")))
+      || buttons.find((el) => /(modal|dialog|popup|弹窗)/i.test((el.className || "") + " " + (el.id || "")));
+    if (closeBtn) {
+      closeBtn.click();
+      return { ok: true, value: "dismissed modal via close control: " + (computeAccessibleName(closeBtn) || closeBtn.textContent || "").slice(0, 40) };
+    }
+    // 没有可点关闭控件：按 Escape 关闭键盘可关闭的弹窗
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", code: "Escape", bubbles: true }));
+    return { ok: true, value: "sent Escape to dismiss modal" };
+  }
   if (name === "extract_text") {
     return extractPageText(args.maxChars || 4000);
   }
