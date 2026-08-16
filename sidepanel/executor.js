@@ -401,7 +401,7 @@ async function executeStep(step, ctx) {
     }
   }
   
-  return { ok: false, error: `step exceeded ${maxTurns} turns without finish` };
+  return { ok: false, error: `step exceeded ${maxTurns} turns without finish`, errorCode: "STEP_TURNS_EXHAUSTED" };
 }
 
 async function handleRecovery(ctx, errorCode, errorDetails) {
@@ -844,6 +844,17 @@ async function execute(plan, ctx) {
       });
       ctx.onLog("plan", "新计划: " + newPlan.steps.map((s, i) => `${i + 1}. ${s.description}`).join(" | "));
       pushStepEvent({ type: "replan", stepIndex: current, description: step.description, failedError: result.errorCode || "", failedReason: (result.error || "").slice(0, 300) });
+      // 防抖：如果重规划没有真正换策略（步骤和旧计划 current.. 之后几乎相同），
+      // 继续 replan 只会无进展重试到 maxReplans。立即停止，避免复杂任务反复重规划。
+      const oldRemaining = plan.steps.slice(current).map((s) => (s.description || "").trim());
+      const newStepsD = newPlan.steps.map((s) => (s.description || "").trim());
+      const noProgress = oldRemaining.length && newStepsD.length &&
+        oldRemaining.length === newStepsD.length &&
+        oldRemaining.every((d, i) => d === newStepsD[i]);
+      if (noProgress) {
+        ctx.onLog("warn", "重规划未改变策略（步骤与之前相同），停止避免无进展重试");
+        return { ok: false, error: `replan made no progress on step "${step.description}"`, errorCode: "REPLAN_NO_PROGRESS", resume: buildResume(), events: stepEvents };
+      }
       plan.steps = plan.steps.slice(0, current).concat(newPlan.steps);
       runCtx.plan = plan;
       attemptsForStep = 0;

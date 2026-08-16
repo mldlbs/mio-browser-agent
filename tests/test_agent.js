@@ -948,6 +948,9 @@ function assertEq(got, want, name) {
   assert(stepLogs.some(([t, txt]) => t === "step" && txt.includes("[2/2]")), "step 2 executed after finish");
 
   // ── executor replan on repeated failure ──
+  // replan 返回与旧计划完全相同的步骤 = 无进展。防抖应拦截（停止而非
+  // 无进展重试到 maxReplans），避免复杂任务反复重规划。这是对用户反馈
+  // "复杂任务反复重试/重规划" 的针对性防护。
   const failBridge = {
     snapshot: async () => ({ url: "u", title: "t", elements: [] }),
     executeAction: async () => ({ ok: false, error: "boom" }),
@@ -971,7 +974,7 @@ function assertEq(got, want, name) {
     }
   );
   assert(replanned === 1, "executor replans after repeated failures");
-  assert(res2.ok, "executor completes after replan");
+  assert(!res2.ok && res2.errorCode === "REPLAN_NO_PROGRESS", "identical replan is stopped by the no-progress guard (no endless replan loop)");
 
   // ── executor 返回步骤事件流（失败透明度数据源）──
   const evBridge = {
@@ -1062,6 +1065,25 @@ function assertEq(got, want, name) {
   assert(multiReplans === 1, "multi-step task replans once");
   assert(multiRes.ok && multiRes.summary === "C done", "multi-step task completes after replan");
   assert(JSON.stringify(replanDoneArg) === JSON.stringify(["A"]), "replan receives the completed step list");
+
+  // ── replan 防抖：即使 maxReplans 较大，replan 一直返回相同步骤也应在
+  //    第一次 no-progress 时停止（而非无进展重试到超限）──
+  let stuckReplans = 0;
+  const stuckLlm = mockLlm(Array.from({ length: 40 }, () =>
+    () => ({ content: "", toolCalls: [makeToolCall("click", { index: 99 })] })  // 永远失败
+  ));
+  const stuckRes = await executorMod.execute(
+    { goal: "g", steps: [{ description: "B" }] },
+    {
+      llm: stuckLlm, bridge: execBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {},
+      replan: async () => { stuckReplans++; return { goal: "g", steps: [{ description: "B" }] }; },  // 每次都返回相同计划
+      maxTurns: 2, maxStepRetries: 1, maxReplans: 5, isStopped: () => false,
+    }
+  );
+  assert(!stuckRes.ok, "identical replan eventually fails the task");
+  assert(stuckReplans === 1, "identical replan is stopped at the first no-progress replan (got " + stuckReplans + ")");
 
 
 
@@ -2111,6 +2133,29 @@ function assertEq(got, want, name) {
     }
   );
   assert(failProg.some((e) => e.status === "failed"), "progress emits failed on step failure");
+
+  // ── maxTurns exhaustion: 步骤耗尽 turn 无进展，必须带可诊断 errorCode，
+  //    供 replan 注入针对性引导（否则 replan 无引导重试同一路径 → 反复重规划）──
+  const turnsExhaustLlm = mockLlm(Array.from({ length: 10 }, () =>
+    () => ({ content: "看看页面", toolCalls: [makeToolCall("wait", { ms: 10 })] })  // 永远不 finish
+  ));
+  const turnsExhaustRes = await executorMod.executeStep(
+    { description: "多步无进展步骤" },
+    {
+      llm: turnsExhaustLlm, bridge: execBridge, memory: memoryMod.createMemory(),
+      getTool: registryMod.getTool, getToolsSchema: registryMod.getToolsSchema,
+      onLog: () => {}, maxTurns: 3, maxRecoveryAttempts: 1, isStopped: () => false,
+      history: [{ role: "system", content: "" }],
+      plan: { goal: "g", steps: [{ description: "多步无进展步骤" }] }, goal: "g",
+    }
+  );
+  assert(!turnsExhaustRes.ok, "maxTurns exhaustion fails the step");
+  assertEq(turnsExhaustRes.errorCode, "STEP_TURNS_EXHAUSTED", "maxTurns exhaustion carries a diagnostic errorCode");
+
+  // replan 收到该 errorCode 时应提供针对"无进展反复重试"的引导
+  const guidanceForTurns = plannerMod.replanGuidance("STEP_TURNS_EXHAUSTED");
+  assert(guidanceForTurns.length > 0, "replan guidance exists for STEP_TURNS_EXHAUSTED");
+  assert(guidanceForTurns.includes("没有进展"), "STEP_TURNS_EXHAUSTED guidance tells the model to stop retrying without progress");
 
   // ── vision fallback ──
   const visionMod = require("../sidepanel/vision.js");

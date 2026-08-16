@@ -83,6 +83,9 @@ const REPLAN_FAILURE_GUIDANCE = {
   SUBMIT_NOT_FOUND: "未能识别表单的提交按钮。新计划应改用快照中的按钮索引直接点击，或用 find_by_vision 定位可见的提交按钮。",
   CLICK_AT_UNVERIFIED: "按坐标点击后页面没有任何变化，说明该坐标处没有目标。不要继续猜测坐标，改用快照索引点击，或 find_by_vision 重新精确定位。",
   SEND_NOT_VERIFIED: "点击发送后未能确认消息发出。新计划应在发送后显式等待并验证（观察输入框清空/新回复出现）。",
+  // 步骤在 turn 数内耗尽却无进展（观察→决策循环空转）。这是复杂任务反复
+  // 重试/重规划的主因：replan 必须引导 LLM 换一种明确、收敛的执行方式。
+  STEP_TURNS_EXHAUSTED: "上一步反复尝试但一直没有进展（每次只观察或做无效小动作，迟迟未完成）。新计划必须为这一步给出一个明确收敛的做法：把该步骤拆成更小的可独立完成的动作，每一步只做一个明确的工具调用并尽快 finish；不要在计划里让 agent 反复观察、等待或重试同一动作。若该步骤依赖的页面还没加载好，先用 navigate/wait 明确等到页面就绪再操作。",
 };
 
 function replanGuidance(errorCode) {
