@@ -23,6 +23,8 @@
 9. **LLM 预设配置（P2，任务 688500d5 完成）**：`storage.js` 新增 `PROVIDER_PRESETS`（OpenAI/DeepSeek/智谱/月之暗面/Ollama 本地/LM Studio 本地/自定义）+ `findProviderPreset`/`isLocalProvider`/`resolveProviderSettings` 纯函数；sidepanel Provider 改下拉，选中自动填 Model+Base URL，自定义保留手填；API Key 留空仅本地 provider 允许（startTask 校验放宽）；设置页加「测试连接」按钮（POST /chat/completions 探测）；单测覆盖归一化。
 10. **首次使用引导（P3，任务 dfb3745a 完成）**：sidepanel 首次打开显示一次性引导遮罩（3 步：打开网站 → 看「本页可做」→ 开始任务，高亮步骤动画 + 圆点进度）；「跳过」或「不再显示」（checkbox + 永久关闭，chrome.storage.local `mioOnboardingDone` 标记）；`storage.js` 加 `normalizeOnboarding` 纯函数可单测；纯 sidepanel 改动零权限。
 11. **失败率优化（P1，任务 c82ccddf 完成）**：`common/error-msg.js` 错误码→小白中文（human/advice，20+ 错误码，`humanizeError`/`humanizeErrorFull`/`humanizeRecoveryEvents`）；`sidepanel/failure-stats.js` 从 history stepEvents 聚合 errorCode 频率 + 成功率统计（top3 定位，`topErrors`/`successRate`）；恢复策略 `ELEMENT_NOT_FOUND` 前置 `wait_and_retry`（页面瞬态渲染是 top1 失败），vision 兜底预算 +4 保证 last-resort 仍执行；UI：onRecovery 日志/计划面板/历史失败分析按钮全部人话化；SW 定时任务失败总结也人话化。
+12. **复杂任务反复重试/重规划修复（P0）**：maxTurns 耗尽带 `STEP_TURNS_EXHAUSTED` errorCode + planner 对应 replan 引导（拆小动作/每轮明确一个调用/尽快 finish）；replan 无进展防抖——新计划与旧计划剩余步骤相同时立即停止（`REPLAN_NO_PROGRESS`），不再无进展重试到 maxReplans；更新被坏行为编码的旧测试。
+13. **页面状态分类（Browser State P0 轻量版）**：`common/page-state.js` 快照特征→页面状态（LOGIN/SEARCH/FORM/TABLE/LIST/DETAIL/EMPTY/GENERIC，优先级：登录>搜索>表格>表单>列表>详情）；executor 每轮向 prompt 注入「[页面状态: X] 是什么页面、优先找什么」，缩小 agent 搜索空间（不再每轮从平铺元素猜目标）。
 
 ## 关键文件
 
@@ -37,6 +39,7 @@
 | `common/fields.js` | 字段语义匹配（FIELD_SYNONYMS，含 title） |
 | `common/history.js` | 历史记录 + 动态上限（SYNC_SESSION_KEY） |
 | `common/templates.js` | 模板系统（内置+自定义，buildShareTemplate/parseShareTemplate 分享闭环） |
+| `common/page-state.js` | 页面状态分类（Browser State，缩小 agent 搜索空间） |
 | `sidepanel/planner.js` | 规划器（splitStages 防单步压扁） |
 | `sidepanel/bridge.js` | 页面桥（支持固定 tabId，定时任务用） |
 | `background/service-worker.js` | alarms 定时触发 + 后台执行完整 runtime |

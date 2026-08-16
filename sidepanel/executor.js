@@ -158,11 +158,17 @@ async function executeStep(step, ctx) {
       ctx._riskRounds = 0;
     }
     const diff = ctx.memory.remember(snapshot);
+    // 页面状态聚焦：根据当前页面特征注入「是什么页面、优先找什么」，缩小
+    // agent 搜索空间（避免每轮从平铺元素里重新猜目标）。
+    const pageStateMod = (typeof module !== "undefined" ? require("../common/page-state.js") : globalThis.PageStateModule) || null;
+    const pageState = pageStateMod ? pageStateMod.classifyPageState(snapshot) : "";
+    const stateFocus = pageStateMod ? pageStateMod.pageFocusPrompt(snapshot, pageState) : "";
+    const stateLine = pageState ? `[页面状态: ${String(pageState).toUpperCase()}]` + (stateFocus ? " " + stateFocus : "") : "";
     ctx.history.push({ 
       role: "user", 
-      content: snapshotToLines(snapshot) + changeNote(ctx.memory.diff || diff) + notesNote(ctx.notes)
+      content: snapshotToLines(snapshot) + changeNote(ctx.memory.diff || diff) + notesNote(ctx.notes) + (stateLine ? "\n" + stateLine : "")
     });
-    onLog("debug", _snapshotStats(snapshot));
+    onLog("debug", _snapshotStats(snapshot) + (stateLine ? " | " + stateLine.slice(0, 40) : ""));
     
     // Generate LLM prompt for Act turn
     const systemPrompt = buildSystemPrompt(ctx.goal, ctx.plan, step);

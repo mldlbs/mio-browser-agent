@@ -11,6 +11,7 @@ const taskMemoryMod = require("../common/task-memory.js");
 const schedulerMod = require("../common/scheduler.js");
 const errorMsgMod = require("../common/error-msg.js");
 const toolLabelsMod = require("../common/tool-labels.js");
+const pageStateMod = require("../common/page-state.js");
 const adapterMod = require("../llm/adapter.js");
 global.registerProvider = adapterMod.registerProvider;
 global.normalizeCompletion = adapterMod.normalizeCompletion;
@@ -1555,6 +1556,51 @@ function assertEq(got, want, name) {
   const waitSel = toolLabelsMod.describeToolCall("wait", { selector: ".btn" });
   assert(waitSel.includes("等待"), "describeToolCall wait selector");
   assertEq(toolLabelsMod.describeToolCall("extract_text", {}), "读取页面文字", "describeToolCall extract_text");
+
+  // ══ 页面状态分类（common/page-state.js，Browser State P0）══
+  assertEq(pageStateMod.classifyPageState({ url: "u", title: "t", elements: [] }), pageStateMod.PAGE_STATES.EMPTY, "empty snapshot -> EMPTY");
+  const loginSnap = { url: "https://x.com/login", title: "登录", elements: [
+    { role: "textbox", name: "用户名", inputType: "text" },
+    { role: "textbox", name: "密码", inputType: "password" },
+    { role: "button", name: "登录" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(loginSnap), "login", "password field -> LOGIN");
+  const searchSnap = { url: "https://x.com", title: "首页", elements: [
+    { role: "textbox", name: "搜索", placeholder: "输入关键词", inputType: "text" },
+    { role: "button", name: "搜索" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(searchSnap), "search", "search box + submit -> SEARCH");
+  const formSnap = { url: "https://x.com/f", title: "表单", elements: [
+    { role: "textbox", name: "姓名", inputType: "text" },
+    { role: "textbox", name: "邮箱", inputType: "text" },
+    { role: "button", name: "提交" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(formSnap), "form", ">=2 inputs + submit -> FORM");
+  const tableSnap = { url: "https://x.com", title: "报表", elements: [
+    { role: "row", name: "" }, { role: "cell", name: "" }, { role: "cell", name: "" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(tableSnap), "table", "table/row elements -> TABLE");
+  const listSnap = { url: "https://x.com/search?q=abc", title: "结果", elements: [
+    { role: "link", name: "下一页", text: "下一页" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(listSnap), "list", "next-page link -> LIST");
+  const detailSnap = { url: "https://x.com/item/123", title: "商品", elements: [
+    { role: "link", name: "首页" }, { role: "button", name: "加入购物车" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(detailSnap), "detail", "/item/ url -> DETAIL");
+  const genericSnap = { url: "https://x.com", title: "首页", elements: [{ role: "link", name: "首页" }] };
+  assertEq(pageStateMod.classifyPageState(genericSnap), "generic", "plain page -> GENERIC");
+  // 优先级：登录（密码框）> 搜索 > 表格 > 表单 > 列表 > 详情
+  const loginWins = { url: "https://x.com/item/1", title: "t", elements: [
+    { role: "textbox", name: "密码", inputType: "password" },
+  ] };
+  assertEq(pageStateMod.classifyPageState(loginWins), "login", "password outranks detail url");
+  // 聚焦提示
+  const loginFocus = pageStateMod.pageFocusPrompt(loginSnap);
+  assert(loginFocus.includes("登录按钮"), "login focus mentions login button (got " + JSON.stringify(loginFocus) + ")");
+  const emptyFocus = pageStateMod.pageFocusPrompt({ url: "u", title: "t", elements: [] });
+  assert(emptyFocus.includes("等待"), "empty focus tells agent to wait");
+  assertEq(pageStateMod.pageFocusPrompt(genericSnap), "", "generic has no focus prompt");
 
   // ══ Phase 2: recovery actions wired through executor ══
   // retry_snapshot: transient element-not-found on first turn → recovery retries → success on next turn

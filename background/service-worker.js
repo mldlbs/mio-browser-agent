@@ -16,6 +16,7 @@ importScripts(
   "../common/error-msg.js",
   "../common/fields.js",
   "../common/tool-labels.js",
+  "../common/page-state.js",
   "../common/history.js",
   "../common/task-memory.js",
   "../common/scheduler.js",
